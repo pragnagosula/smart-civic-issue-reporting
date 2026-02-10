@@ -23,7 +23,10 @@ router.post('/login', authController.login);
 router.post('/login-verify', authController.loginVerify);
 router.post('/admin-login', authController.adminLogin);
 
+const authMiddleware = require('../middleware/authMiddleware');
+
 // Officer Routes
 router.post('/officer-register', upload.single('document'), officerController.registerOfficer);
+router.post('/fcm-token', authMiddleware, authController.updateFcmToken);
 
 module.exports = router;

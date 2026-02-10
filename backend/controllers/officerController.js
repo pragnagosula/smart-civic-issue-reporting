@@ -4,6 +4,8 @@ const fs = require('fs');
 const pdf = require('pdf-parse');
 const cloudinary = require('cloudinary').v2;
 const Tesseract = require('tesseract.js');
+const { sendNotification } = require('../services/notificationService');
+const { sendEmail } = require('../utils/emailService');
 
 // 🔐 Cloudinary config
 cloudinary.config({
@@ -182,14 +184,24 @@ exports.getDepartmentIssues = async (req, res) => {
         console.log("Fetching issues for department:", department);
 
         if (!department) {
-            return res.status(400).json({ message: "Officer department not found in token" });
+            // Fallback: If for some reason token doesn't have dept, fetch from DB
+            const user = await sql`SELECT department FROM users WHERE id = ${req.user.id}`;
+            if (user.length > 0) {
+                req.user.department = user[0].department;
+            } else {
+                return res.status(400).json({ message: "Officer department not found" });
+            }
         }
 
         const issues = await sql`
             SELECT * FROM issues 
-            WHERE LOWER(category) = LOWER(${department}) 
-            OR assigned_officer_id = ${req.user.id}
-            ORDER BY created_at DESC
+            WHERE 
+                (LOWER(category) = LOWER(${req.user.department}) AND status IN ('Assigned', 'In Progress', 'Resolved'))
+            OR 
+                assigned_officer_id = ${req.user.id}
+            ORDER BY 
+                CASE WHEN assigned_officer_id = ${req.user.id} THEN 0 ELSE 1 END,
+                created_at DESC
         `;
 
         res.json(issues);
@@ -202,22 +214,98 @@ exports.getDepartmentIssues = async (req, res) => {
 exports.updateIssueStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status } = req.body; // 'In Progress', 'Resolved'
+        const { status } = req.body;
 
         if (!['In Progress', 'Resolved', 'Rejected'].includes(status)) {
             return res.status(400).json({ message: "Invalid status" });
         }
 
-        const result = await sql`
-            UPDATE issues
-            SET status = ${status}, updated_at = NOW(), assigned_officer_id = ${req.user.id}
-            WHERE id = ${id}
-            RETURNING *
-        `;
+        // Fetch Issue Details (Citizen ID)
+        const issueRes = await sql`SELECT citizen_id FROM issues WHERE id = ${id}`;
+        const citizenId = issueRes.length > 0 ? issueRes[0].citizen_id : null;
 
-        if (result.length === 0) return res.status(404).json({ message: "Issue not found" });
+        // Special handling for REJECTED
+        if (status === 'Rejected') {
+            const officerId = req.user.id;
+            const currentIssue = await sql`
+                SELECT id, category, latitude, longitude, rejection_count, rejected_by 
+                FROM issues WHERE id = ${id}
+            `;
+            if (currentIssue.length === 0) return res.status(404).json({ message: "Issue not found" });
 
-        res.json({ message: "Issue updated", issue: result[0] });
+            const issue = currentIssue[0];
+            const currentCount = (issue.rejection_count || 0) + 1;
+            let rejectedBy = issue.rejected_by || [];
+            // Ensure unique
+            if (!rejectedBy.includes(officerId)) rejectedBy.push(officerId);
+
+            if (currentCount >= 3) {
+                // ESCALATE
+                const result = await sql`
+                    UPDATE issues
+                    SET status = 'Escalated', 
+                        rejection_count = ${currentCount},
+                        rejected_by = ${rejectedBy},
+                        updated_at = NOW(),
+                        assigned_officer_id = NULL
+                    WHERE id = ${id}
+                    RETURNING *
+                 `;
+
+                // Notify Admin
+                if (process.env.ADMIN_EMAIL) {
+                    await sendEmail(process.env.ADMIN_EMAIL, "Escalation Alert", `Issue ${id} has been rejected 3 times and is now Escalated.`);
+                }
+                return res.json({ message: "Issue Rejected. Max rejections reached -> Escalated to Admin.", issue: result[0] });
+
+            } else {
+                // Auto-Reassign
+                await sql`
+                    UPDATE issues
+                    SET rejection_count = ${currentCount},
+                        rejected_by = ${rejectedBy},
+                        updated_at = NOW(),
+                        assigned_officer_id = NULL
+                    WHERE id = ${id}
+                `;
+                const assignmentService = require('../services/assignmentService');
+                const newOfficer = await assignmentService.assignOfficerToIssue(
+                    issue.id, issue.category, Number(issue.latitude), Number(issue.longitude), rejectedBy
+                );
+
+                if (newOfficer) {
+                    return res.json({ message: `Issue Rejected. Reassigned to ${newOfficer.name}` });
+                } else {
+                    await sql`UPDATE issues SET status = 'Escalated' WHERE id = ${id}`;
+                    // Notify Admin
+                    if (process.env.ADMIN_EMAIL) {
+                        await sendEmail(process.env.ADMIN_EMAIL, "Escalation Alert", `Issue ${id} rejected and no other officers available.`);
+                    }
+                    return res.json({ message: "Issue Rejected. No other officers available -> Escalated to Admin." });
+                }
+            }
+
+        } else {
+            // Normal Status Update (In Progress, Resolved)
+            const result = await sql`
+                UPDATE issues
+                SET status = ${status}, updated_at = NOW(), assigned_officer_id = ${req.user.id}
+                WHERE id = ${id}
+                RETURNING *
+            `;
+            if (result.length === 0) return res.status(404).json({ message: "Issue not found" });
+
+            // Notifications
+            if (citizenId) {
+                if (status === 'Resolved') {
+                    await sendNotification(citizenId, "Issue Resolved", "Your issue has been marked as Resolved. Please provide feedback.", { type: 'feedback_request', issue_id: id });
+                } else if (status === 'In Progress') {
+                    await sendNotification(citizenId, "Work Started", "Work has started on your issue.");
+                }
+            }
+
+            res.json({ message: "Issue updated", issue: result[0] });
+        }
 
     } catch (err) {
         console.error("Update Issue Status Error:", err);

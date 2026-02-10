@@ -200,7 +200,7 @@ const ReportIssue = () => {
             });
 
             console.log("Submission Success:", response.data);
-            alert("Issue reported successfully!");
+            alert(response.data.message || "Issue reported successfully!"); // Show tailored message (Duplicate/Flagged/Success)
             navigate('/dashboard');
 
         } catch (error) {

@@ -215,3 +215,14 @@ exports.adminLogin = async (req, res) => {
         res.status(500).json({ message: "Server error during admin login" });
     }
 };
+
+exports.updateFcmToken = async (req, res) => {
+    try {
+        const { fcm_token } = req.body;
+        await sql`UPDATE users SET fcm_token = ${fcm_token} WHERE id = ${req.user.id}`;
+        res.json({ message: 'FCM Token updated' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};

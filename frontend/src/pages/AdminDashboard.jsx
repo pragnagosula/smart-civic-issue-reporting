@@ -9,9 +9,24 @@ const AdminDashboard = () => {
 
 
 
+    const [issues, setIssues] = useState([]);
+
     useEffect(() => {
         fetchPendingOfficers();
+        fetchAllIssues();
     }, []);
+
+    const fetchAllIssues = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get('http://localhost:5000/api/admin/all-issues', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setIssues(res.data);
+        } catch (err) {
+            console.error("Failed to fetch issues", err);
+        }
+    };
 
     const fetchPendingOfficers = async () => {
         try {
@@ -124,39 +139,84 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
+                <EscalatedIssuesTable issues={issues.filter(i => i.status === 'Escalated')} officers={officers} />
+
                 <h2 style={{ marginTop: '3rem' }}>All Reported Issues</h2>
                 <div style={{ overflowX: 'auto' }}>
-                    <IssuesTable />
+                    <IssuesTable issues={issues} officers={officers} />
                 </div>
             </main>
         </div>
     );
 };
 
+// Escalated Issues Component
+const EscalatedIssuesTable = ({ issues, officers }) => {
+    if (issues.length === 0) return null;
+
+    const getOfficerName = (id) => {
+        const off = officers.find(o => o.id === id);
+        return off ? off.name : 'Unknown';
+    };
+
+    return (
+        <div style={{ marginTop: '3rem', border: '1px solid #ef4444', borderRadius: '8px', padding: '1rem', background: 'rgba(239, 68, 68, 0.05)' }}>
+            <h2 style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                ⚠️ Escalated Issues (Multiple Rejections)
+            </h2>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem', color: 'white' }}>
+                <thead>
+                    <tr style={{ background: '#7f1d1d', textAlign: 'left' }}>
+                        <th style={{ padding: '12px' }}>Category</th>
+                        <th style={{ padding: '12px' }}>Rejections</th>
+                        <th style={{ padding: '12px' }}>Rejected By</th>
+                        <th style={{ padding: '12px' }}>Time</th>
+                        <th style={{ padding: '12px' }}>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {issues.map(issue => (
+                        <tr key={issue.id} style={{ borderBottom: '1px solid #991b1b' }}>
+                            <td style={{ padding: '12px' }}>{issue.category}</td>
+                            <td style={{ padding: '12px', fontWeight: 'bold', color: '#fca5a5' }}>
+                                {issue.rejection_count} Times
+                            </td>
+                            <td style={{ padding: '12px', fontSize: '0.9rem', color: '#cbd5e1' }}>
+                                {(issue.rejected_by || []).map(id => getOfficerName(id)).join(', ')}
+                            </td>
+                            <td style={{ padding: '12px' }}>{new Date(issue.timestamp || issue.created_at).toLocaleString()}</td>
+                            <td style={{ padding: '12px' }}>
+                                <button
+                                    onClick={() => window.location.href = `#issue-${issue.id}`} // Simple anchor or handling
+                                    style={{
+                                        background: '#ef4444', color: 'white',
+                                        padding: '6px 12px', border: 'none',
+                                        borderRadius: '4px', cursor: 'pointer',
+                                        fontWeight: 'bold'
+                                    }}
+                                >
+                                    Review
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
 // Sub-component for clean code
-const IssuesTable = () => {
-    const [issues, setIssues] = useState([]);
-    const [loading, setLoading] = useState(true);
+const IssuesTable = ({ issues: propIssues, officers }) => {
+    // Prefer props, otherwise internal (legacy, though parent should be active now)
+    const issues = propIssues || [];
     const [selectedIssue, setSelectedIssue] = useState(null);
 
-    useEffect(() => {
-        const fetchIssues = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await axios.get('http://localhost:5000/api/admin/all-issues', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setIssues(res.data);
-            } catch (err) {
-                console.error("Failed to fetch issues", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchIssues();
-    }, []);
+    // If no issues provided via props, and no internal fetch here, we rely on parent.
+    // If parent logic failed, issues is empty array.
 
-    if (loading) return <p>Loading issues...</p>;
+
+    if (!issues) return <p>Loading issues...</p>;
 
     return (
         <>
@@ -276,6 +336,75 @@ const IssuesTable = () => {
                                     <div style={{ color: '#cbd5e1' }}>
                                         <span style={{ color: '#94a3b8', marginRight: '8px' }}>Reasoning:</span>
                                         {selectedIssue.ai_reason}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Officer Assignment */}
+                            <div>
+                                <strong style={{ color: '#e2e8f0', marginBottom: '8px', display: 'block' }}>Officer Assignment</strong>
+                                <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '6px' }}>
+                                    {selectedIssue.assigned_officer_id ? (
+                                        <div style={{ marginBottom: '1rem' }}>
+                                            <span style={{ color: '#94a3b8' }}>Currently Assigned to: </span>
+                                            <strong style={{ color: '#4ade80' }}>
+                                                {officers.find(o => o.id === selectedIssue.assigned_officer_id)?.name || 'Unknown Officer'}
+                                            </strong>
+                                        </div>
+                                    ) : (
+                                        <div style={{ marginBottom: '1rem', color: '#f87171' }}>Unassigned</div>
+                                    )}
+
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <select
+                                            id="officer-select"
+                                            style={{
+                                                flex: 1,
+                                                padding: '8px',
+                                                borderRadius: '4px',
+                                                background: '#1e293b',
+                                                color: 'white',
+                                                border: '1px solid #475569'
+                                            }}
+                                        >
+                                            <option value="">Select Officer...</option>
+                                            {officers
+                                                .filter(o => o.account_status === 'ACTIVE')
+                                                .map(o => (
+                                                    <option key={o.id} value={o.id}>
+                                                        {o.name} ({o.department}) - {o.ai_score} Score
+                                                    </option>
+                                                ))
+                                            }
+                                        </select>
+                                        <button
+                                            onClick={async () => {
+                                                const select = document.getElementById('officer-select');
+                                                const officerId = select.value;
+                                                if (!officerId) return alert('Please select an officer');
+
+                                                try {
+                                                    const token = localStorage.getItem('token');
+                                                    await axios.post(`http://localhost:5000/api/issues/assign/${selectedIssue.id}`,
+                                                        { officerId },
+                                                        { headers: { Authorization: `Bearer ${token}` } }
+                                                    );
+                                                    alert('Officer assigned successfully');
+                                                    // Close modal and refresh (simplify by just closing for now, or trigger reload)
+                                                    setSelectedIssue(null);
+                                                    window.location.reload();
+                                                } catch (err) {
+                                                    alert('Assignment failed');
+                                                    console.error(err);
+                                                }
+                                            }}
+                                            style={{
+                                                background: '#3b82f6', color: 'white', padding: '8px 16px',
+                                                border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'
+                                            }}
+                                        >
+                                            Assign
+                                        </button>
                                     </div>
                                 </div>
                             </div>

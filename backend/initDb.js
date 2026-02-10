@@ -46,9 +46,10 @@ const initDb = async () => {
             await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS ai_status VARCHAR(20) DEFAULT 'Pending'`;
             await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS ai_confidence DECIMAL(5,2)`;
             await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS ai_reason TEXT`;
-            console.log("AI columns added to 'issues' table.");
+            await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP`;
+            console.log("AI and Assignment columns added to 'issues' table.");
         } catch (alterErr) {
-            console.log("AI columns might already exist or error in issues:", alterErr.message);
+            console.log("AI/Assignment columns might already exist or error in issues:", alterErr.message);
         }
 
         // Add Officer columns to Users table
@@ -60,9 +61,43 @@ const initDb = async () => {
             await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_score DECIMAL(5,2)`;
             await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_result VARCHAR(20)`;
             await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_reason TEXT`;
-            console.log("Officer columns added to 'users' table.");
+            // Add Location columns for Officers
+            await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude DECIMAL(10, 7)`;
+            await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude DECIMAL(10, 7)`;
+            console.log("Officer columns and location added to 'users' table.");
         } catch (alterErr) {
             console.log("Officer columns might already exist or error in users:", alterErr.message);
+        }
+
+        // Duplicate Detection Columns and Tables
+        try {
+            // Add master_issue_id to issues table
+            await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS master_issue_id INTEGER REFERENCES issues(id)`;
+            console.log("Added master_issue_id to 'issues'.");
+
+            // Create Issue-Citizen Mapping Table for Crowdsourcing
+            await sql`
+                CREATE TABLE IF NOT EXISTS issue_citizens (
+                    issue_id INTEGER REFERENCES issues(id),
+                    citizen_id UUID REFERENCES users(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (issue_id, citizen_id)
+                )
+            `;
+            console.log("Table 'issue_citizens' created.");
+
+            // Attempt to enable PostGIS-like distance function if needed (or we use Haversine in code/sql)
+            // Note: simple haversine distance function in SQL is efficient for this.
+            // But user asked for PostGIS. Let's try to add the extension if possible.
+            try {
+                await sql`CREATE EXTENSION IF NOT EXISTS postgis`;
+                console.log("PostGIS extension enabled.");
+            } catch (pgErr) {
+                console.log("PostGIS could not be enabled (might not be supported on this tier). Will use Haversine formula fallback.");
+            }
+
+        } catch (dupErr) {
+            console.error("Error setting up duplicate detection schema:", dupErr.message);
         }
 
         console.log('Tables "users" and "issues" created successfully (if they didn\'t exist).');

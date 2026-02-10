@@ -16,6 +16,24 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
     console.warn("EMAIL_APP_PASSWORD present:", !!process.env.EMAIL_APP_PASSWORD);
 }
 
+const sendEmail = async (to, subject, text) => {
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to,
+        subject,
+        text
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`Email sent to ${to}`);
+        return true;
+    } catch (error) {
+        console.error('Error sending generic email:', error.message);
+        return false;
+    }
+};
+
 const sendOTP = async (email, otp) => {
     const mailOptions = {
         from: process.env.EMAIL_USER,
@@ -38,4 +56,4 @@ const sendOTP = async (email, otp) => {
     }
 };
 
-module.exports = { sendOTP };
+module.exports = { sendOTP, sendEmail };

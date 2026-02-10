@@ -183,5 +183,82 @@ def analyze_issue(request: IssueAnalysisRequest):
             "ai_reason": "AI Service Error"
         }
 
+# ===============================
+# DUPLICATE DETECTION API
+# ===============================
+from typing import List
+
+class CandidateIssue(BaseModel):
+    id: int
+    text: str
+    latitude: float
+    longitude: float
+    hours_diff: float # Time difference in hours
+
+class DuplicateCheckRequest(BaseModel):
+    new_text: str
+    new_lat: float
+    new_lng: float
+    candidates: List[CandidateIssue]
+
+@app.post("/check-duplicate")
+def check_duplicate(request: DuplicateCheckRequest):
+    try:
+        if not request.candidates:
+            return {"is_duplicate": False, "master_issue_id": None, "score": 0.0}
+
+        new_embedding = text_model.encode(request.new_text or "")
+        
+        best_match_id = None
+        highest_score = 0.0
+        
+        for candidate in request.candidates:
+            # 1. Semantic Text Similarity (0.5 weight)
+            cand_embedding = text_model.encode(candidate.text or "")
+            semantic_sim = float(util.cos_sim(new_embedding, cand_embedding)[0][0])
+            
+            # 2. Distance Score (0.3 weight) - Pre-filtered by DB but closer is better
+            # Assume strict filter is 200m. 
+            # We don't have exact distance here unless passed, but we can approximate or assume DB filter is enough.
+            # User Algorithm: (0.3 * distance_score). Let's assume passed candidates are close.
+            # We'll calculate simple euclidean for score component as a proxy for Haversine on small scale
+            # Or simplified: if it's in the list, it's "close enough" for base score, but we can refine.
+            # Let's use 1.0 for distance score for now since DB did the heavy lifting of 200m radius.
+            distance_score = 1.0 
+            
+            # 3. Time Proximity (0.2 weight)
+            # 7 days = 168 hours. Score = 1 - (diff / 168)
+            time_score = max(0, 1 - (candidate.hours_diff / 168.0))
+            
+            # Composite Score
+            # duplicate_score = (0.5 × text_similarity) + (0.3 × distance_score) + (0.2 × time_proximity)
+            # *Refinement*: The user spec says distance score is a component.
+            # If we assume DB filter = 100% score? No, closer is better.
+            # Let's say 200m = 0 score, 0m = 1 score.
+            # We unfortunately don't have the exact distance passed in request, only lat/lng.
+            # Let's calculate rough distance (Euclidean on lat/lng is okay for small diffs 0.002 approx 200m)
+            deg_diff = ((request.new_lat - candidate.latitude)**2 + (request.new_lng - candidate.longitude)**2)**0.5
+            # 0.002 degrees is approx 220m.
+            distance_score = max(0, 1 - (deg_diff / 0.002))
+
+            duplicate_score = (0.5 * semantic_sim) + (0.3 * distance_score) + (0.2 * time_score)
+            
+            if duplicate_score > highest_score:
+                highest_score = duplicate_score
+                best_match_id = candidate.id
+
+        # Threshold decision
+        is_duplicate = highest_score >= 0.75
+        
+        return {
+            "is_duplicate": is_duplicate,
+            "master_issue_id": best_match_id if is_duplicate else None,
+            "score": round(highest_score, 2)
+        }
+
+    except Exception as e:
+        print("DUPLICATE CHECK ERROR:", str(e))
+        return {"is_duplicate": False, "master_issue_id": None, "score": 0.0}
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

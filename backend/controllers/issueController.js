@@ -88,14 +88,93 @@ exports.reportIssue = async (req, res) => {
         }
 
         // ------------------------------
-        // 4️⃣ Determine Status (Handle FLAGGED)
+        // 4️⃣ Determine Status & Check DUPLICATES
         // ------------------------------
         let issueStatus = 'Reported';
+        let masterIssueId = null;
 
-        // If AI explicitly says FLAGGED, mark it.
-        // Also check if status was manually set (less likely from citizen)
-        if (aiResult.ai_status === 'FLAGGED' || aiResult.category === 'Flagged') {
+        // If AI explicitly says FLAGGED or confidence is low
+        if (aiResult.ai_status === 'FLAGGED' || aiResult.category === 'Flagged' || (aiResult.ai_confidence > 0 && aiResult.ai_confidence < 0.35)) {
             issueStatus = 'Flagged';
+        } else {
+            // Only check for duplicates if it's a valid, Verified issue
+            try {
+                // Step 1: Candidate Filtering (DB Level)
+                // Same category, within 7 days, ~200m radius (using Haversine approximation in SQL)
+                // 6371 * acos(...) is standard formula.
+                const candidates = await sql`
+                    SELECT id, voice_text, latitude, longitude,
+                    EXTRACT(EPOCH FROM (NOW() - created_at))/3600 as hours_diff
+                    FROM issues
+                    WHERE category = ${aiResult.category}
+                    AND status IN ('Reported', 'In Progress', 'Verified')
+                    AND created_at >= NOW() - INTERVAL '7 days'
+                    AND (
+                        6371 * acos(
+                            cos(radians(${latitude})) * cos(radians(latitude)) *
+                            cos(radians(longitude) - radians(${longitude})) +
+                            sin(radians(${latitude})) * sin(radians(latitude))
+                        )
+                    ) <= 0.2
+                `;
+
+                if (candidates.length > 0) {
+                    // Step 2: Call AI Semantic Check
+                    const dupCheck = await axios.post('http://localhost:8000/check-duplicate', {
+                        new_text: voiceText || '',
+                        new_lat: latitude,
+                        new_lng: longitude,
+                        candidates: candidates.map(c => ({
+                            id: c.id,
+                            text: c.voice_text,
+                            latitude: parseFloat(c.latitude),
+                            longitude: parseFloat(c.longitude),
+                            hours_diff: parseFloat(c.hours_diff)
+                        }))
+                    });
+
+                    if (dupCheck.data.is_duplicate) {
+                        issueStatus = 'Duplicate'; // Or keep 'Reported' but implied duplicate
+                        masterIssueId = dupCheck.data.master_issue_id;
+                        console.log(`Duplicate detected! Linked to Master ID: ${masterIssueId}, Score: ${dupCheck.data.score}`);
+                    }
+                }
+            } catch (dupErr) {
+                console.error("Duplicate check failed:", dupErr.message);
+                // Fail safe: proceed as new issue
+            }
+        }
+
+        // ------------------------------
+        // 4.5 👮 Officer Assignment (One-Time)
+        // ------------------------------
+        // Only run if Verified (Reported) and NOT a Duplicate
+        let assignedOfficerId = null;
+        let assignedAt = null;
+
+        if (issueStatus === 'Reported' && !masterIssueId) {
+            try {
+                // Use new Auto-Assign Service
+                const assignmentService = require('../services/assignmentService');
+                const officer = await assignmentService.assignOfficerToIssue(null, aiResult.category, latitude, longitude);
+                // Note: assignOfficerToIssue needs an ID to update.
+                // But here we haven't INSERTED yet.
+                // Logic change: We should FIND the officer first, then INSERT with the ID.
+
+                // Let's use `findBestOfficer` directly here to get ID for INSERT.
+                // Then we don't need to update later.
+                const bestOfficer = await assignmentService.findBestOfficer(aiResult.category, latitude, longitude);
+
+                if (bestOfficer) {
+                    assignedOfficerId = bestOfficer.id;
+                    issueStatus = 'Assigned'; // Update status immediately
+                    assignedAt = new Date();
+                    console.log(`[Report] Auto-assigned to ${bestOfficer.name}`);
+                }
+
+            } catch (assignErr) {
+                console.error("Officer assignment failed:", assignErr.message);
+            }
         }
 
         // ------------------------------
@@ -114,7 +193,10 @@ exports.reportIssue = async (req, res) => {
                 timestamp,
                 ai_status,
                 ai_confidence,
-                ai_reason
+                ai_reason,
+                master_issue_id,
+                assigned_officer_id,
+                assigned_at
             ) VALUES (
                 ${citizen_id},
                 ${imageUrl},
@@ -127,18 +209,50 @@ exports.reportIssue = async (req, res) => {
                 ${timestamp || new Date()},
                 ${aiResult.ai_status},
                 ${aiResult.ai_confidence},
-                ${aiResult.ai_reason}
+                ${aiResult.ai_reason},
+                ${masterIssueId},
+                ${assignedOfficerId},
+                ${assignedAt}
             )
-            RETURNING id, category, status, timestamp, ai_status
+            RETURNING id, category, status, timestamp, ai_status, master_issue_id, assigned_officer_id
         `;
 
-        // If flagged, maybe we tell the user? 
-        // Or we just say "Reported" to avoid confrontation?
-        // User request: "if a issue is flagged it should not get reported" -> This usually means "don't show up on valid lists".
-        // But we return success here. The logic is now handled by status 'Flagged'.
+        const newIssueId = issues[0].id;
+
+        // ------------------------------
+        // 6️⃣ Update Crowdsourcing Map
+        // ------------------------------
+        // If it's a duplicate, we link this citizen to the MASTER issue as well (or just track their submission)
+        // User Logic: "Link citizen to master issue".
+        // We'll insert into issue_citizens for the MAIN issue ID that represents this problem.
+        // If masterIssueId exists, use that. If not, use newIssueId.
+        const trackingId = masterIssueId || newIssueId;
+
+        try {
+            await sql`
+                INSERT INTO issue_citizens (issue_id, citizen_id)
+                VALUES (${trackingId}, ${citizen_id})
+                ON CONFLICT DO NOTHING
+            `;
+        } catch (mapErr) {
+            console.error("Failed to map citizen to issue:", mapErr.message);
+        }
+
+        // Notification Logic
+        const { sendNotification } = require('../services/notificationService');
+        if (issueStatus === 'Flagged') {
+            await sendNotification(citizenId, "Issue Flagged", "Your report has been flagged for manual review.");
+        } else if (issueStatus === 'Duplicate') {
+            await sendNotification(citizenId, "Duplicate Detected", "Your report was linked to an existing issue.");
+        } else {
+            // "Your issue has been verified"
+            await sendNotification(citizenId, "Issue Verified", "Your issue has been verified.");
+        }
 
         res.status(201).json({
-            message: issueStatus === 'Flagged' ? 'Issue flagged for review' : 'Issue reported successfully',
+            message: issueStatus === 'Flagged' ? 'Issue flagged for review'
+                : issueStatus === 'Duplicate' ? 'Report linked to existing issue'
+                    : 'Issue reported successfully',
             issue: issues[0]
         });
 
@@ -152,10 +266,11 @@ exports.getMyIssues = async (req, res) => {
     try {
         const citizen_id = req.user.id;
         // Optimize: Exclude 'image' column to speed up list loading
+        // Filter out FLAGGED issues from citizen view
         const issues = await sql`
             SELECT id, category, status, timestamp, voice_text, latitude, longitude, language, created_at, ai_status 
             FROM issues 
-            WHERE citizen_id = ${citizen_id} 
+            WHERE citizen_id = ${citizen_id} AND status != 'Flagged'
             ORDER BY created_at DESC
         `;
         res.json(issues);
@@ -190,4 +305,54 @@ exports.getIssueDetails = async (req, res) => {
 // Admin function to get ALL details (just in case needed here, though adminController usually handles it)
 exports.getAllIssues = async (req, res) => {
     // This logic is usually in adminController, checking just in case.
+};
+
+exports.assignIssue = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { officerId } = req.body;
+
+        if (!officerId) {
+            return res.status(400).json({ message: 'Officer ID is required' });
+        }
+
+        // Verify officer exists and is active
+        const officer = await sql`
+            SELECT id, email, account_status, department FROM users 
+            WHERE id = ${officerId} AND role = 'officer'
+        `;
+
+        if (officer.length === 0) {
+            return res.status(404).json({ message: 'Officer not found' });
+        }
+
+        if (officer[0].account_status !== 'ACTIVE') {
+            return res.status(400).json({ message: 'Officer is not active' });
+        }
+
+        const updatedIssue = await sql`
+            UPDATE issues
+            SET 
+                assigned_officer_id = ${officerId},
+                assigned_at = NOW(),
+                status = 'Assigned'
+            WHERE id = ${id}
+            RETURNING *
+        `;
+
+        if (updatedIssue.length === 0) {
+            return res.status(404).json({ message: 'Issue not found' });
+        }
+
+        console.log(`[Admin Audit] Admin manually assigned Issue ${id} to ${officer[0].email} (${officer[0].department})`);
+
+        res.json({
+            message: `Issue assigned to ${officer[0].email}`,
+            issue: updatedIssue[0]
+        });
+
+    } catch (err) {
+        console.error('Error assigning issue:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 };

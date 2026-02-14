@@ -1,6 +1,7 @@
 const sql = require('../db');
 const axios = require('axios');
 const cloudinary = require('cloudinary').v2;
+const { translateText, translateAndDetect } = require('../services/translationService');
 
 // Cloudinary config
 cloudinary.config({
@@ -61,6 +62,29 @@ exports.reportIssue = async (req, res) => {
         }
 
         // ------------------------------
+        // 2.5 Translate Text
+        // ------------------------------
+        let translations = {};
+        let languageDetected = 'en';
+        let originalDetectedLanguage = 'en';
+
+        if (voiceText) {
+            try {
+                const translationResult = await translateAndDetect(voiceText);
+                translations = translationResult.translations;
+                originalDetectedLanguage = translationResult.detectedLanguage;
+                languageDetected = translationResult.detectedLanguage; // Mapping to existing 'language' column
+
+                // Ensure English exists (User requirement)
+                if (!translations.en) translations.en = voiceText;
+
+            } catch (transErr) {
+                console.error("Translation failed:", transErr.message);
+                translations = { en: voiceText, hi: voiceText, te: voiceText };
+            }
+        }
+
+        // ------------------------------
         // 3️⃣ Call AI Service
         // ------------------------------
         let aiResult = {
@@ -74,8 +98,8 @@ exports.reportIssue = async (req, res) => {
             const aiResponse = await axios.post(
                 'http://localhost:8000/analyze',
                 {
-                    image, // Sending base64 to AI if needed in future
-                    text: voiceText || ''
+                    image,
+                    text: (translations && translations.en) ? translations.en : (voiceText || '') // Enforce English for AI
                 },
                 { timeout: 15000 }
             );
@@ -100,10 +124,9 @@ exports.reportIssue = async (req, res) => {
             // Only check for duplicates if it's a valid, Verified issue
             try {
                 // Step 1: Candidate Filtering (DB Level)
-                // Same category, within 7 days, ~200m radius (using Haversine approximation in SQL)
-                // 6371 * acos(...) is standard formula.
+                // Use English description for better matching
                 const candidates = await sql`
-                    SELECT id, voice_text, latitude, longitude,
+                    SELECT id, description->>'en' as voice_text, latitude, longitude,
                     EXTRACT(EPOCH FROM (NOW() - created_at))/3600 as hours_diff
                     FROM issues
                     WHERE category = ${aiResult.category}
@@ -121,12 +144,12 @@ exports.reportIssue = async (req, res) => {
                 if (candidates.length > 0) {
                     // Step 2: Call AI Semantic Check
                     const dupCheck = await axios.post('http://localhost:8000/check-duplicate', {
-                        new_text: voiceText || '',
+                        new_text: (translations && translations.en) ? translations.en : (voiceText || ''), // Enforce English for DupCheck
                         new_lat: latitude,
                         new_lng: longitude,
                         candidates: candidates.map(c => ({
                             id: c.id,
-                            text: c.voice_text,
+                            text: c.voice_text, // This is now English from the query alias
                             latitude: parseFloat(c.latitude),
                             longitude: parseFloat(c.longitude),
                             hours_diff: parseFloat(c.hours_diff)
@@ -134,7 +157,7 @@ exports.reportIssue = async (req, res) => {
                     });
 
                     if (dupCheck.data.is_duplicate) {
-                        issueStatus = 'Duplicate'; // Or keep 'Reported' but implied duplicate
+                        issueStatus = 'Duplicate';
                         masterIssueId = dupCheck.data.master_issue_id;
                         console.log(`Duplicate detected! Linked to Master ID: ${masterIssueId}, Score: ${dupCheck.data.score}`);
                     }
@@ -186,6 +209,8 @@ exports.reportIssue = async (req, res) => {
                 image,
                 voice_text,
                 language,
+                original_language,
+                description,
                 category,
                 latitude,
                 longitude,
@@ -201,7 +226,9 @@ exports.reportIssue = async (req, res) => {
                 ${citizen_id},
                 ${imageUrl},
                 ${voiceText || ''},
-                ${language || 'en'},
+                ${languageDetected || 'en'},
+                ${originalDetectedLanguage || 'en'},
+                ${JSON.stringify(translations || {})},
                 ${aiResult.category},
                 ${latitude},
                 ${longitude},
@@ -250,12 +277,12 @@ exports.reportIssue = async (req, res) => {
         // Notification Logic
         const { sendNotification } = require('../services/notificationService');
         if (issueStatus === 'Flagged') {
-            await sendNotification(citizenId, "Issue Flagged", "Your report has been flagged for manual review.");
+            await sendNotification(citizen_id, "Issue Flagged", "Your report has been flagged for manual review.");
         } else if (issueStatus === 'Duplicate') {
-            await sendNotification(citizenId, "Duplicate Detected", "Your report was linked to an existing issue.");
+            await sendNotification(citizen_id, "Duplicate Detected", "Your report was linked to an existing issue.");
         } else {
             // "Your issue has been verified"
-            await sendNotification(citizenId, "Issue Verified", "Your issue has been verified.");
+            await sendNotification(citizen_id, "Issue Verified", "Your issue has been verified.");
         }
 
         res.status(201).json({
@@ -271,18 +298,38 @@ exports.reportIssue = async (req, res) => {
     }
 };
 
+const getLocalizedText = (obj, lang) => {
+    if (!obj) return null;
+    if (typeof obj === 'string') return obj;
+    return obj[lang] || obj['en'] || Object.values(obj)[0] || '';
+};
+
 exports.getMyIssues = async (req, res) => {
     try {
         const citizen_id = req.user.id;
         // Optimize: Exclude 'image' column to speed up list loading
         // Filter out FLAGGED issues from citizen view
         const issues = await sql`
-            SELECT id, category, status, timestamp, voice_text, latitude, longitude, language, created_at, ai_status 
+            SELECT id, category, status, timestamp, voice_text, description, latitude, longitude, language, created_at, ai_status 
             FROM issues 
             WHERE citizen_id = ${citizen_id} AND status != 'Flagged'
             ORDER BY created_at DESC
         `;
-        res.json(issues);
+
+        const userLang = req.user.language || req.user.preferred_language || 'en';
+
+        const localizedIssues = issues.map(issue => {
+            const desc = getLocalizedText(issue.description, userLang);
+            return {
+                ...issue,
+                description: desc || issue.voice_text, // Return text only
+                voice_text: desc || issue.voice_text, // Legacy support
+                // Clean up raw JSON to prevent leaking all languages
+                original_language: undefined
+            };
+        });
+
+        res.json(localizedIssues);
     } catch (err) {
         console.error('Error fetching issues:', err);
         res.status(500).json({ message: 'Server error' });
@@ -318,6 +365,20 @@ exports.getIssueDetails = async (req, res) => {
         if (issue.citizen_id !== citizen_id && !issue.is_linked) {
             return res.status(403).json({ message: 'Unauthorized access to this issue' });
         }
+
+        const userLang = req.user.language || req.user.preferred_language || 'en';
+
+        // Localize Fields
+        const desc = getLocalizedText(issue.description, userLang);
+        issue.description = desc || issue.voice_text;
+        issue.voice_text = desc || issue.voice_text;
+
+        if (issue.resolution_note) {
+            issue.resolution_note = getLocalizedText(issue.resolution_note, userLang);
+        }
+
+        // Clean up
+        // delete issue.description; // We keep it as string now, overwriting object
 
         res.json(issue);
     } catch (err) {

@@ -1,5 +1,6 @@
 const sql = require('../db');
 const { sendEmail } = require('../utils/emailService');
+const { translateText } = require('./translationService');
 const admin = require('firebase-admin');
 
 // Initialize Firebase
@@ -30,12 +31,33 @@ const sendNotification = async (userId, title, body, data = {}) => {
     try {
         // 1. Fetch User Details (FCM Token, Email, Preferences)
         const userResult = await sql`
-            SELECT email, fcm_token, notifications_enabled 
+            SELECT email, fcm_token, notifications_enabled, preferred_language 
             FROM users WHERE id = ${userId}
         `;
 
         if (userResult.length === 0) return;
-        const { email, fcm_token, notifications_enabled } = userResult[0];
+        const { email, fcm_token, notifications_enabled, preferred_language } = userResult[0];
+
+        // Translate Title & Body if not English
+        // Default to English if translation fails or checks
+        let finalTitle = title;
+        let finalBody = body;
+
+        const lang = preferred_language || 'en';
+        if (lang !== 'en') {
+            try {
+                // Parallel translation
+                const [tTitle, tBody] = await Promise.all([
+                    translateText(title),
+                    translateText(body)
+                ]);
+                finalTitle = tTitle[lang] || title;
+                finalBody = tBody[lang] || body;
+            } catch (transErr) {
+                console.warn("Notification translation failed, invalid input/output:", transErr.message);
+                // Fallback to English/Original
+            }
+        }
 
         // 2. Log Action (Pending)
         const log = await sql`
@@ -50,7 +72,7 @@ const sendNotification = async (userId, title, body, data = {}) => {
         // 3. Try FCM if token exists and enabled
         if (notifications_enabled && fcm_token && admin.apps.length) {
             const message = {
-                notification: { title, body },
+                notification: { title: finalTitle, body: finalBody },
                 data: { ...data, timestamp: new Date().toISOString() },
                 token: fcm_token
             };
@@ -73,7 +95,7 @@ const sendNotification = async (userId, title, body, data = {}) => {
 
         if (!sentViaFCM) {
             console.log(`[Email] Sending fallback to ${email}`);
-            await sendEmail(email, title, `${body}\n\n(Access your dashboard for details)`);
+            await sendEmail(email, finalTitle, `${finalBody}\n\n(Access your dashboard for details)`);
         }
 
         // Update Log

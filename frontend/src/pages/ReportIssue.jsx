@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/ReportIssue.css';
 
+import { useTranslation } from 'react-i18next';
+
 const ReportIssue = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
 
     // State
@@ -215,16 +218,16 @@ const ReportIssue = () => {
     return (
         <div className="report-container">
             <div className="dashboard-header">
-                <h1>Report New Issue</h1>
-                <button className="btn btn-secondary" onClick={() => navigate('/dashboard')}>Cancel</button>
+                <h1>{t('report_new_issue')}</h1>
+                <button className="btn btn-secondary" onClick={() => navigate('/dashboard')}>{t('cancel')}</button>
             </div>
 
             {/* 1. Camera Section */}
             <section className="camera-section">
-                <h2 className="section-title">📸 Capture Evidence</h2>
+                <h2 className="section-title">📸 {t('capture_evidence')}</h2>
                 <div className="media-container">
                     {!capturedImage && !stream && !cameraError && (
-                        <div className="loading-overlay">Initializing Camera...</div>
+                        <div className="loading-overlay">{t('initializing_camera')}</div>
                     )}
 
                     {cameraError && (
@@ -255,7 +258,7 @@ const ReportIssue = () => {
                 </div>
 
                 {capturedImage && (
-                    <button className="retake-btn btn" onClick={retakePhoto}>Retake Photo</button>
+                    <button className="retake-btn btn" onClick={retakePhoto}>{t('retake_photo')}</button>
                 )}
             </section>
 
@@ -266,17 +269,17 @@ const ReportIssue = () => {
                 <div className="mb-4">
                     {location ? (
                         <span className="location-badge">
-                            📍 Location Fetched: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                            📍 {t('location_fetched')}: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
                         </span>
                     ) : (
                         <span style={{ color: 'var(--error-color)' }}>
-                            {locationError || "📍 Fetching Location..."}
+                            {locationError || `📍 ${t('fetching_location')}`}
                         </span>
                     )}
                 </div>
 
                 {/* Voice Input */}
-                <h2 className="section-title">🎤 Describe the Issue</h2>
+                <h2 className="section-title">🎤 {t('describe_issue')}</h2>
                 <div className="input-group">
                     <div className="voice-controls">
                         <select
@@ -299,13 +302,13 @@ const ReportIssue = () => {
                         </button>
 
                         <span className="voice-status">
-                            {isListening ? "Listening..." : (hasRecordedVoice ? "Voice Recorded ✅" : "Tap mic or type below")}
+                            {isListening ? t('listening') : (hasRecordedVoice ? `${t('voice_recorded')} ✅` : t('tap_mic'))}
                         </span>
                     </div>
 
                     <textarea
                         className="input-field"
-                        placeholder="Type description or use voice input..."
+                        placeholder={t('type_description')}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         style={{ minHeight: '80px' }}
@@ -320,12 +323,12 @@ const ReportIssue = () => {
                     onClick={handleSubmit}
                     disabled={!canSubmit}
                 >
-                    {isSubmitting ? "Submitting..." : "Submit Report"}
+                    {isSubmitting ? t('submitting') : t('submit_report')}
                 </button>
 
                 {!canSubmit && (
                     <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
-                        * Photo, Location, and Description (Voice or Text) are required.
+                        {t('required_fields')}
                     </p>
                 )}
             </section>

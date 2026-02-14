@@ -26,7 +26,7 @@ app.listen(PORT, () => {
 
     // Start SLA & Deadline Background Tasks
     const { checkSLAAndReassign } = require('./services/assignmentService');
-    const { checkResolutionDeadlines } = require('./services/cronService');
+    const { checkResolutionDeadlines } = require('./services/cronJob');
 
     setInterval(() => {
         checkSLAAndReassign();

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n'; // Import i18n instance
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const OTPVerify = () => {
@@ -57,6 +58,7 @@ const OTPVerify = () => {
                 localStorage.setItem('token', token);
                 if (user.preferred_language) {
                     localStorage.setItem('language', user.preferred_language);
+                    i18n.changeLanguage(user.preferred_language);
                 }
                 if (user.role === "admin") {
                     navigate("/admin/dashboard");

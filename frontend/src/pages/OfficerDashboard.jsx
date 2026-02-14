@@ -3,10 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/Dashboard.css';
 
+import { useTranslation } from 'react-i18next';
+
 const OfficerDashboard = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [issues, setIssues] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
+
+    const { i18n } = useTranslation();
+
+    const getLocalizedDescription = (issue) => {
+        if (!issue.description) return issue.voice_text || 'No description';
+        if (typeof issue.description === 'string') return issue.description; // fallback
+        return issue.description[i18n.language] || issue.description['en'] || issue.voice_text || 'No description';
+    };
 
     React.useEffect(() => {
         fetchIssues();
@@ -137,11 +148,11 @@ const OfficerDashboard = () => {
                         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem', color: 'white', minWidth: '800px' }}>
                             <thead>
                                 <tr style={{ background: '#334155', textAlign: 'left' }}>
-                                    <th style={{ padding: '12px' }}>Category</th>
-                                    <th style={{ padding: '12px' }}>Description (Voice)</th>
-                                    <th style={{ padding: '12px' }}>Location</th>
-                                    <th style={{ padding: '12px' }}>AI Confidence</th>
-                                    <th style={{ padding: '12px' }}>Status</th>
+                                    <th style={{ padding: '12px' }}>{t('category', { defaultValue: 'Category' })}</th>
+                                    <th style={{ padding: '12px' }}>{t('description_voice', { defaultValue: 'Description (Voice)' })}</th>
+                                    <th style={{ padding: '12px' }}>{t('location', { defaultValue: 'Location' })}</th>
+                                    <th style={{ padding: '12px' }}>{t('ai_confidence', { defaultValue: 'AI Confidence' })}</th>
+                                    <th style={{ padding: '12px' }}>{t('status', { defaultValue: 'Status' })}</th>
                                     <th style={{ padding: '12px' }}>Evidence</th>
                                     <th style={{ padding: '12px' }}>Actions</th>
                                 </tr>
@@ -158,10 +169,10 @@ const OfficerDashboard = () => {
                                                 backgroundColor: isAssigned ? 'rgba(34, 197, 94, 0.1)' : 'transparent'
                                             }}>
                                                 <td style={{ padding: '12px' }}>
-                                                    {issue.category}
+                                                    {t('cat_' + (issue.category === 'Street Lighting' ? 'lighting' : issue.category === 'Water Supply' ? 'water' : issue.category.toLowerCase()), { defaultValue: issue.category })}
                                                     {isAssigned && <div style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>⭐ ASSIGNED TO YOU</div>}
                                                 </td>
-                                                <td style={{ padding: '12px' }}>{issue.voice_text || 'No description'}</td>
+                                                <td style={{ padding: '12px' }}>{getLocalizedDescription(issue)}</td>
                                                 <td style={{ padding: '12px' }}>{issue.latitude || 'N/A'}, {issue.longitude || 'N/A'}</td>
                                                 <td style={{ padding: '12px' }}>{(issue.ai_confidence * 100).toFixed(0)}%</td>
                                                 <td style={{ padding: '12px' }}>
@@ -170,7 +181,7 @@ const OfficerDashboard = () => {
                                                         background: issue.status === 'Resolved' ? '#166534' : issue.status === 'In Progress' ? '#ca8a04' : issue.status === 'Assigned' ? '#0ea5e9' : '#ef4444',
                                                         color: 'white'
                                                     }}>
-                                                        {issue.status}
+                                                        {t('status_' + issue.status.toLowerCase().replace(' ', ''), { defaultValue: issue.status })}
                                                     </span>
                                                 </td>
                                                 <td style={{ padding: '12px' }}>

@@ -3,13 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/Dashboard.css'; // Reusing dashboard styles for consistency
 
+import { useTranslation } from 'react-i18next';
+
 const IssueDetails = () => {
+    const { t, i18n } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
     const [issue, setIssue] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+
+    const getLocalizedDescription = (issue) => {
+        if (!issue.description) return issue.voice_text || t('no_description');
+        if (typeof issue.description === 'string') return issue.description;
+        return issue.description[i18n.language] || issue.description['en'] || issue.voice_text || t('no_description');
+    };
 
     useEffect(() => {
         const fetchIssueDetails = async () => {
@@ -43,15 +52,15 @@ const IssueDetails = () => {
     return (
         <div className="container" style={{ paddingBottom: '3rem' }}>
             <button className="btn btn-secondary mb-4" onClick={() => navigate('/dashboard')}>
-                &larr; Back to Dashboard
+                &larr; {t('back_dashboard', { defaultValue: 'Back to Dashboard' })}
             </button>
 
             <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                    <h1>{issue.category}</h1>
+                    <h1>{t('cat_' + (issue.category === 'Street Lighting' ? 'lighting' : issue.category === 'Water Supply' ? 'water' : issue.category.toLowerCase()), { defaultValue: issue.category })}</h1>
                     <span className={`status-badge status-${(issue.status || 'reported').toLowerCase().replace(' ', '-')}`}
                         style={{ fontSize: '1rem', padding: '0.5rem 1rem' }}>
-                        {issue.status}
+                        {t('status_' + (issue.status || 'Reported').toLowerCase().replace(' ', ''), { defaultValue: issue.status })}
                     </span>
                 </div>
 
@@ -79,19 +88,19 @@ const IssueDetails = () => {
                 )}
 
                 <div className="mb-4">
-                    <h3 style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '0.5rem' }}>DESCRIPTION (Voice Input)</h3>
+                    <h3 style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '0.5rem' }}>{t('description_voice', { defaultValue: 'DESCRIPTION (Voice Input)' })}</h3>
                     <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', fontSize: '1.1rem' }}>
-                        {issue.voice_text || "No description provided."}
+                        {getLocalizedDescription(issue)}
                     </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
-                        <h3 style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '0.2rem' }}>REPORTED ON</h3>
+                        <h3 style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '0.2rem' }}>{t('reported_on', { defaultValue: 'REPORTED ON' })}</h3>
                         <p>{formatDate(issue.timestamp)}</p>
                     </div>
                     <div>
-                        <h3 style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '0.2rem' }}>LOCATION</h3>
+                        <h3 style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '0.2rem' }}>{t('location', { defaultValue: 'LOCATION' })}</h3>
                         <p>
                             <a
                                 href={`https://www.google.com/maps/search/?api=1&query=${issue.latitude},${issue.longitude}`}

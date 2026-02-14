@@ -194,7 +194,8 @@ exports.getDepartmentIssues = async (req, res) => {
         }
 
         const issues = await sql`
-            SELECT * FROM issues 
+            SELECT id, category, status, timestamp, voice_text, description, latitude, longitude, created_at, assigned_officer_id 
+            FROM issues 
             WHERE 
                 (LOWER(category) = LOWER(${req.user.department}) AND status IN ('Assigned', 'In Progress', 'Resolved'))
             OR 
@@ -204,7 +205,27 @@ exports.getDepartmentIssues = async (req, res) => {
                 created_at DESC
         `;
 
-        res.json(issues);
+        const userLang = req.user.language || req.user.preferred_language || 'en';
+
+        // Helper (duplicated for now to avoid circular deps or verify if imported)
+        const getLocalizedText = (obj, lang) => {
+            if (!obj) return null;
+            if (typeof obj === 'string') return obj;
+            return obj[lang] || obj['en'] || Object.values(obj)[0] || '';
+        };
+
+        const localizedIssues = issues.map(issue => {
+            const desc = getLocalizedText(issue.description, userLang);
+            return {
+                ...issue,
+                description: desc || issue.voice_text,
+                voice_text: desc || issue.voice_text,
+                // Localize note if exists
+                resolution_note: getLocalizedText(issue.resolution_note, userLang) || issue.resolution_note
+            };
+        });
+
+        res.json(localizedIssues);
     } catch (err) {
         console.error("Get Officer Issues Error:", err);
         res.status(500).json({ message: "Server error" });

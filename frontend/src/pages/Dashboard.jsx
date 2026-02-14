@@ -43,14 +43,23 @@ const Dashboard = () => {
         navigate('/report-issue');
     };
 
+    const handleProfile = () => {
+        navigate('/citizen/profile');
+    };
+
     return (
         <div className="dashboard-container">
             {/* 3. Logout Element (placed in header for standard UI pattern) */}
             <header className="dashboard-header">
                 <h1>Citizen Dashboard</h1>
-                <button className="logout-btn" onClick={handleLogout}>
-                    Logout
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button className="logout-btn" onClick={handleProfile} style={{ backgroundColor: '#2196f3' }}>
+                        My Profile
+                    </button>
+                    <button className="logout-btn" onClick={handleLogout}>
+                        Logout
+                    </button>
+                </div>
             </header>
 
             <main>

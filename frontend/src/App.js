@@ -14,6 +14,10 @@ import OfficerRegister from './pages/OfficerRegister';
 import OfficerScreening from './pages/OfficerScreening';
 import AdminDashboard from './pages/AdminDashboard';
 import OfficerDashboard from './pages/OfficerDashboard';
+import OfficerProfile from './pages/OfficerProfile';
+import DepartmentAnalytics from './pages/DepartmentAnalytics';
+import CivicHealthDashboard from './pages/CivicHealthDashboard';
+import CitizenProfile from './pages/CitizenProfile';
 
 function App() {
   const { i18n } = useTranslation();
@@ -79,6 +83,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/officer/dashboard"
           element={
@@ -87,8 +92,41 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* Analytics Routes */}
+        <Route
+          path="/officer/profile"
+          element={
+            <ProtectedRoute>
+              <OfficerProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/department-analytics"
+          element={
+            <ProtectedRoute>
+              <DepartmentAnalytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/civic-health"
+          element={
+            <ProtectedRoute>
+              <CivicHealthDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/citizen/profile"
+          element={
+            <ProtectedRoute>
+              <CitizenProfile />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
-    </Router>
+    </Router >
   );
 }
 

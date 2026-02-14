@@ -143,3 +143,24 @@ DO UPDATE SET role = 'admin', account_status = 'ACTIVE';
 *   `GET /api/admin/pending-officers`
 *   `POST /api/admin/approve/:id`
 *   `POST /api/admin/reject/:id`
+
+## 8. Issue Resolution Flow (Officer)
+Core feature for maintaining accountability.
+
+### Step 1: Officer Marks "Resolved"
+*   **Action**: Selects "Resolved" status in Dashboard.
+*   **Requirement**: Officer MUST upload a "Resolution Proof" image.
+*   **System Action**: Captures GPS Location automatically.
+
+### Step 2: Backend Processing
+*   **Backend API**: `PATCH /api/officer/issue/:id/status`
+*   **Uploads**: Image to Cloudinary (`resolution_proofs` folder).
+*   **Updates Database**:
+    *   `status` = 'Resolved'
+    *   `resolved_at` = SERVER TIME
+    *   `resolution_image_url` = Cloudinary URL
+    *   `resolution_lat`, `resolution_lng` = Officer's GPS Coords
+    *   `resolution_proof_metadata` = User Agent + IP
+
+### Step 3: Notification
+*   **Citizen**: Receives "Issue Resolved" notification + Request for Feedback.

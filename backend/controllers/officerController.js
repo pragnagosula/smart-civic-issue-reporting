@@ -220,9 +220,44 @@ exports.updateIssueStatus = async (req, res) => {
             return res.status(400).json({ message: "Invalid status" });
         }
 
-        // Fetch Issue Details (Citizen ID)
-        const issueRes = await sql`SELECT citizen_id FROM issues WHERE id = ${id}`;
-        const citizenId = issueRes.length > 0 ? issueRes[0].citizen_id : null;
+        // Fetch Current Issue Status
+        const currentIssue = await sql`SELECT status, citizen_id FROM issues WHERE id = ${id}`;
+        if (currentIssue.length === 0) return res.status(404).json({ message: "Issue not found" });
+        const { status: currentStatus, citizen_id: citizenId } = currentIssue[0];
+
+        // 🛡️ STATE MACHINE ENFORCEMENT
+        // Report -> Assigned (System)
+        // Assigned -> In Progress
+        // In Progress -> Resolved
+        // Resolved -> Closed (Feedback) | Reopened (Feedback)
+        // Reopened -> Assigned (System)
+
+        const allowedTransitions = {
+            'Reported': ['Assigned', 'Rejected'], // Officers might pick up Reported issues directly? usually system assigns.
+            'Assigned': ['In Progress', 'Rejected'],
+            'In Progress': ['Resolved', 'Rejected'],
+            'Resolved': [], // Officer cannot move from Resolved. Only Feedback moves it to Closed or Reopened.
+            'Reopened': ['Assigned', 'In Progress', 'Rejected'], // If reassigned to same officer, they can start.
+            'Closed': [], // Final State. No edits.
+            'Escalated': ['Assigned', 'Resolved'] // Admin might intervene
+        };
+
+        // Check if transition is valid
+        // Note: 'Rejected' logic is handled separately below but technically is a transition.
+        if (currentStatus === 'Closed') {
+            return res.status(403).json({ message: "Action Denied: Issue is permanently Closed." });
+        }
+
+        // Skip check if current status is same (idempotent)
+        if (currentStatus !== status) {
+            const validNext = allowedTransitions[currentStatus] || [];
+            if (!validNext.includes(status)) {
+                return res.status(400).json({
+                    message: `Invalid State Transition. Cannot move from '${currentStatus}' to '${status}'.`,
+                    allowed: validNext
+                });
+            }
+        }
 
         // Special handling for REJECTED
         if (status === 'Rejected') {
@@ -285,8 +320,74 @@ exports.updateIssueStatus = async (req, res) => {
                 }
             }
 
+        } else if (status === 'Resolved') {
+            // ------------------------------
+            // RESOLUTION WITH PROOF
+            // ------------------------------
+            const { image, latitude, longitude } = req.body;
+
+            // 1. Validate Proof
+            if (!image || !latitude || !longitude) {
+                return res.status(400).json({ message: "Resolution proof (image) and location are required." });
+            }
+
+            // 2. Upload Proof Image to Cloudinary
+            let resolutionImageUrl = '';
+            try {
+                if (image.startsWith('data:image')) {
+                    const uploadResult = await cloudinary.uploader.upload(image, {
+                        folder: 'resolution_proofs',
+                        resource_type: 'image'
+                    });
+                    resolutionImageUrl = uploadResult.secure_url;
+                } else {
+                    resolutionImageUrl = image; // Should not happen in normal flow
+                }
+            } catch (err) {
+                console.error('Resolution Image upload failed:', err.message);
+                return res.status(500).json({ message: 'Failed to upload resolution document.' });
+            }
+
+            // 3. Update Database with Proof Metadata
+            // - resolved_at = Server Time (NOW())
+            // - resolution_lat/lng = Officer Location
+            const result = await sql`
+                UPDATE issues
+                SET 
+                    status = 'Resolved',
+                    updated_at = NOW(),
+                    resolved_at = NOW(),
+                    resolution_image_url = ${resolutionImageUrl},
+                    resolution_lat = ${latitude},
+                    resolution_lng = ${longitude},
+                    assigned_officer_id = ${req.user.id},
+                    resolution_proof_metadata = ${JSON.stringify({ device: req.headers['user-agent'], ip: req.ip })}
+                WHERE id = ${id}
+                RETURNING *
+            `;
+
+            if (result.length === 0) return res.status(404).json({ message: "Issue not found" });
+
+            // 4. Notify ALL Linked Citizens (Reporter + Crowdsourced)
+            try {
+                const linkedCitizens = await sql`
+                    SELECT DISTINCT citizen_id FROM issue_citizens WHERE issue_id = ${id}
+                `;
+
+                // If the table is empty (legacy issues), fallback to the main citizenId
+                const recipients = linkedCitizens.length > 0 ? linkedCitizens.map(r => r.citizen_id) : (citizenId ? [citizenId] : []);
+
+                for (const citId of recipients) {
+                    await sendNotification(citId, "Issue Resolved", "Title: Issue Resolved.\nMessage: Please review the resolution proof and provide feedback to close the issue.", { type: 'feedback_request', issue_id: id });
+                }
+            } catch (notifErr) {
+                console.error("Failed to send resolution notifications:", notifErr);
+            }
+
+            res.json({ message: "Issue resolved with proof", issue: result[0] });
+
         } else {
-            // Normal Status Update (In Progress, Resolved)
+            // Normal Status Update (In Progress)
             const result = await sql`
                 UPDATE issues
                 SET status = ${status}, updated_at = NOW(), assigned_officer_id = ${req.user.id}
@@ -297,9 +398,7 @@ exports.updateIssueStatus = async (req, res) => {
 
             // Notifications
             if (citizenId) {
-                if (status === 'Resolved') {
-                    await sendNotification(citizenId, "Issue Resolved", "Your issue has been marked as Resolved. Please provide feedback.", { type: 'feedback_request', issue_id: id });
-                } else if (status === 'In Progress') {
+                if (status === 'In Progress') {
                     await sendNotification(citizenId, "Work Started", "Work has started on your issue.");
                 }
             }

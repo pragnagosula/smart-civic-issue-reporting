@@ -220,22 +220,31 @@ exports.reportIssue = async (req, res) => {
         const newIssueId = issues[0].id;
 
         // ------------------------------
-        // 6️⃣ Update Crowdsourcing Map
+        // 6️⃣ Update Crowdsourcing Map & Impact Metrics
         // ------------------------------
-        // If it's a duplicate, we link this citizen to the MASTER issue as well (or just track their submission)
-        // User Logic: "Link citizen to master issue".
-        // We'll insert into issue_citizens for the MAIN issue ID that represents this problem.
-        // If masterIssueId exists, use that. If not, use newIssueId.
+        // If masterIssueId exists, use that.
         const trackingId = masterIssueId || newIssueId;
 
         try {
+            // Insert into issue_citizens
             await sql`
                 INSERT INTO issue_citizens (issue_id, citizen_id)
                 VALUES (${trackingId}, ${citizen_id})
                 ON CONFLICT DO NOTHING
             `;
+
+            // If Duplicate, increment affected_citizen_count on Master Issue
+            if (masterIssueId) {
+                await sql`
+                    UPDATE issues 
+                    SET affected_citizen_count = affected_citizen_count + 1 
+                    WHERE id = ${masterIssueId}
+                `;
+                console.log(`[Impact] Incremented affected count for Master Issue ${masterIssueId}`);
+            }
+
         } catch (mapErr) {
-            console.error("Failed to map citizen to issue:", mapErr.message);
+            console.error("Failed to update impact metrics:", mapErr.message);
         }
 
         // Notification Logic
@@ -283,19 +292,34 @@ exports.getMyIssues = async (req, res) => {
 exports.getIssueDetails = async (req, res) => {
     try {
         const { id } = req.params;
-        const citizen_id = req.user.id; // Corrected: Using authMiddleware user
+        const citizen_id = req.user.id;
 
-        // Fetch full details including image
+        // Check if user is authorized (Reporter OR Crowdsourced)
+        // We use a LEFT JOIN on issue_citizens to check linkage
+        // Also LEFT JOIN users to get Officer Name
         const issues = await sql`
-            SELECT * FROM issues 
-            WHERE id = ${id} AND citizen_id = ${citizen_id}
+            SELECT i.*, 
+                   u.name as officer_name,
+                   u.department as officer_department,
+                   CASE WHEN ic.citizen_id IS NOT NULL THEN true ELSE false END as is_linked
+            FROM issues i
+            LEFT JOIN users u ON i.assigned_officer_id = u.id
+            LEFT JOIN issue_citizens ic ON i.id = ic.issue_id AND ic.citizen_id = ${citizen_id}
+            WHERE i.id = ${id}
         `;
 
         if (issues.length === 0) {
             return res.status(404).json({ message: 'Issue not found' });
         }
 
-        res.json(issues[0]);
+        const issue = issues[0];
+
+        // Authorization Check
+        if (issue.citizen_id !== citizen_id && !issue.is_linked) {
+            return res.status(403).json({ message: 'Unauthorized access to this issue' });
+        }
+
+        res.json(issue);
     } catch (err) {
         console.error('Error fetching issue details:', err);
         res.status(500).json({ message: 'Server error' });

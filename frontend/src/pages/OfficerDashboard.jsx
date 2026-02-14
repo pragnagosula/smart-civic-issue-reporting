@@ -32,15 +32,80 @@ const OfficerDashboard = () => {
         }
     };
 
-    const updateStatus = async (id, newStatus) => {
+    const [showResolveModal, setShowResolveModal] = React.useState(false);
+    const [selectedIssueId, setSelectedIssueId] = React.useState(null);
+    const [resolutionImage, setResolutionImage] = React.useState(null);
+    const [resolving, setResolving] = React.useState(false);
+
+    const handleStatusChange = (id, newStatus) => {
+        if (newStatus === 'Resolved') {
+            setSelectedIssueId(id);
+            setShowResolveModal(true);
+        } else {
+            updateStatus(id, newStatus);
+        }
+    };
+
+    const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setResolutionImage(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const confirmResolution = () => {
+        if (!resolutionImage) {
+            alert("Please upload a proof image.");
+            return;
+        }
+
+        setResolving(true);
+
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser");
+            setResolving(false);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                // Call updateStatus with extra data
+                updateStatus(selectedIssueId, 'Resolved', {
+                    image: resolutionImage,
+                    latitude,
+                    longitude
+                });
+                // Reset/Close Modal
+                setShowResolveModal(false);
+                setResolutionImage(null);
+                setSelectedIssueId(null);
+                setResolving(false);
+            },
+            (err) => {
+                console.error(err);
+                alert("Unable to retrieve your location. Location is mandatory for resolution.");
+                setResolving(false);
+            }
+        );
+    };
+
+    const updateStatus = async (id, newStatus, extraData = {}) => {
         try {
             const token = localStorage.getItem('token');
+            const payload = { status: newStatus, ...extraData };
+
             await axios.patch(`http://localhost:5000/api/officer/issue/${id}/status`,
-                { status: newStatus },
+                payload,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             fetchIssues(); // Refresh
         } catch (err) {
+            console.error(err);
             alert('Failed to update status');
         }
     };
@@ -50,11 +115,20 @@ const OfficerDashboard = () => {
         navigate('/login');
     };
 
+    const handleProfile = () => {
+        navigate('/officer/profile');
+    };
+
     return (
         <div className="dashboard-container">
             <header className="dashboard-header">
                 <h1>Officer Dashboard</h1>
-                <button className="logout-btn" onClick={handleLogout}>Logout</button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button className="logout-btn" onClick={handleProfile} style={{ backgroundColor: '#2196f3' }}>
+                        My Stats
+                    </button>
+                    <button className="logout-btn" onClick={handleLogout}>Logout</button>
+                </div>
             </header>
             <main style={{ padding: '2rem' }}>
                 <h2>Assigned & Department Issues</h2>
@@ -77,13 +151,7 @@ const OfficerDashboard = () => {
                                     <tr><td colSpan="7" style={{ padding: '20px', textAlign: 'center' }}>No issues found for your department.</td></tr>
                                 ) : (
                                     issues.map(issue => {
-                                        // Simple decode of token to get ID, or assume backend returns 'isAssignedToMe' flag
-                                        // For now, let's assume we can get user ID from localStorage or basic parse
-                                        // But actually, backend query includes OR assigned_officer_id. 
-                                        // Let's rely on checking if status is 'Assigned' and maybe we can check ID if available.
-                                        // Better yet, just show the assigned status prominently.
                                         const isAssigned = issue.status === 'Assigned';
-
                                         return (
                                             <tr key={issue.id} style={{
                                                 borderBottom: '1px solid #475569',
@@ -111,11 +179,11 @@ const OfficerDashboard = () => {
                                                 <td style={{ padding: '12px' }}>
                                                     <select
                                                         value={issue.status}
-                                                        onChange={(e) => updateStatus(issue.id, e.target.value)}
+                                                        onChange={(e) => handleStatusChange(issue.id, e.target.value)}
                                                         style={{ padding: '4px', background: '#1e293b', color: 'white', border: '1px solid #475569' }}
                                                     >
                                                         <option value="Reported">Reported</option>
-                                                        <option value="Assigned">Assigned</option>
+                                                        <option value="Assigned">Assigned (Self)</option>
                                                         <option value="In Progress">In Progress</option>
                                                         <option value="Resolved">Resolved</option>
                                                         <option value="Rejected">Rejected</option>
@@ -127,6 +195,49 @@ const OfficerDashboard = () => {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* RESOLUTION PROOF MODAL */}
+                {showResolveModal && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                        backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+                    }}>
+                        <div style={{
+                            background: '#1e293b', padding: '2rem', borderRadius: '10px', width: '400px', color: 'white', border: '1px solid #475569'
+                        }}>
+                            <h3>✅ Verify Resolution</h3>
+                            <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>To mark this issue as Resolved, you must provide proof.</p>
+
+                            <div style={{ margin: '1rem 0' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>1. Upload Resolution Image (Required)</label>
+                                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ width: '100%' }} />
+                                {resolutionImage && <img src={resolutionImage} alt="Preview" style={{ width: '100%', marginTop: '10px', borderRadius: '5px' }} />}
+                            </div>
+
+                            <div style={{ margin: '1rem 0' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>2. GPS Location</label>
+                                <p style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>We will automatically capture your current GPS location as proof of visit.</p>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                                <button
+                                    onClick={confirmResolution}
+                                    disabled={resolving}
+                                    style={{ flex: 1, padding: '10px', background: '#22c55e', border: 'none', borderRadius: '5px', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+                                >
+                                    {resolving ? 'Verifying...' : 'Submit Resolution'}
+                                </button>
+                                <button
+                                    onClick={() => setShowResolveModal(false)}
+                                    disabled={resolving}
+                                    style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid #ef4444', borderRadius: '5px', color: '#ef4444', cursor: 'pointer' }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </main>

@@ -52,6 +52,18 @@ const initDb = async () => {
             console.log("AI/Assignment columns might already exist or error in issues:", alterErr.message);
         }
 
+        // Add Resolution Proof Columns
+        try {
+            await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP`;
+            await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS resolution_image_url TEXT`;
+            await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS resolution_lat DECIMAL(10, 7)`;
+            await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS resolution_lng DECIMAL(10, 7)`;
+            await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS resolution_proof_metadata TEXT`;
+            console.log("Resolution Proof columns added to 'issues' table.");
+        } catch (resErr) {
+            console.log("Resolution Proof columns might already exist or error in issues:", resErr.message);
+        }
+
         // Add Officer columns to Users table
         try {
             await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(100)`;
@@ -76,15 +88,36 @@ const initDb = async () => {
             console.log("Added master_issue_id to 'issues'.");
 
             // Create Issue-Citizen Mapping Table for Crowdsourcing
+            // Create Issue-Citizen Mapping Table for Crowdsourcing
             await sql`
                 CREATE TABLE IF NOT EXISTS issue_citizens (
                     issue_id INTEGER REFERENCES issues(id),
                     citizen_id UUID REFERENCES users(id),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    feedback_status VARCHAR(20) DEFAULT 'PENDING', -- 'VERIFIED', 'REJECTED'
+                    feedback_comment TEXT,
                     PRIMARY KEY (issue_id, citizen_id)
                 )
             `;
             console.log("Table 'issue_citizens' created.");
+
+            // Add feedback columns if table already exists (Manual migration)
+            try {
+                await sql`ALTER TABLE issue_citizens ADD COLUMN IF NOT EXISTS feedback_status VARCHAR(20) DEFAULT 'PENDING'`;
+                await sql`ALTER TABLE issue_citizens ADD COLUMN IF NOT EXISTS feedback_comment TEXT`;
+                // Add Rating Column
+                await sql`ALTER TABLE issue_citizens ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating >= 1 AND rating <= 5)`;
+                console.log("Feedback columns added to 'issue_citizens'.");
+
+                // Add Issue Tracking Columns
+                await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP`;
+                await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS reopen_count INTEGER DEFAULT 0`;
+                await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS affected_citizen_count INTEGER DEFAULT 1`;
+                console.log("Tracking columns added to 'issues'.");
+
+            } catch (colErr) {
+                console.log("Columns might already exist:", colErr.message);
+            }
 
             // Attempt to enable PostGIS-like distance function if needed (or we use Haversine in code/sql)
             // Note: simple haversine distance function in SQL is efficient for this.
@@ -98,6 +131,24 @@ const initDb = async () => {
 
         } catch (dupErr) {
             console.error("Error setting up duplicate detection schema:", dupErr.message);
+        }
+
+        // Notification Logs Table
+        try {
+            await sql`
+                CREATE TABLE IF NOT EXISTS notification_logs (
+                    id SERIAL PRIMARY KEY,
+                    user_id UUID REFERENCES users(id),
+                    type VARCHAR(50),
+                    title TEXT,
+                    body TEXT,
+                    status VARCHAR(20),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `;
+            console.log("Table 'notification_logs' created/checked.");
+        } catch (notifErr) {
+            console.error("Error creating notification_logs table:", notifErr.message);
         }
 
         console.log('Tables "users" and "issues" created successfully (if they didn\'t exist).');

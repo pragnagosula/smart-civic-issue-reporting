@@ -17,15 +17,19 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/issues', issueRoutes);
 app.use('/api/officer', officerRoutes);
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
+app.use('/api/analytics', require('./routes/analyticsRoutes'));
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 
-    // Start SLA Background Task (Run every minute for demo)
+    // Start SLA & Deadline Background Tasks
     const { checkSLAAndReassign } = require('./services/assignmentService');
+    const { checkResolutionDeadlines } = require('./services/cronService');
+
     setInterval(() => {
         checkSLAAndReassign();
+        checkResolutionDeadlines();
     }, 60 * 1000); // 1 minute
 });

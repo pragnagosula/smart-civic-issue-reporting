@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -45,6 +46,7 @@ function App() {
         <Route path="/citizen-signup" element={<Signup />} />
 
         {/* Officer Flow */}
+        <Route path="/officer/profile" element={<OfficerProfile />} />
         <Route path="/officer/register" element={<OfficerRegister />} />
         <Route path="/officer/screening" element={<OfficerScreening />} />
 

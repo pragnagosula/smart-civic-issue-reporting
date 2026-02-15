@@ -1,76 +1,128 @@
+:root {
+  --primary: #3b82f6;
+  --primary-glow: rgba(59, 130, 246, 0.4);
+  --bg-dark: #0f172a;
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --border-light: rgba(255, 255, 255, 0.1);
+}
+
 .role-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 2rem;
-    background: radial-gradient(circle at top left, #1e293b, #0f172a);
-    color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem 1.5rem;
+  background: radial-gradient(circle at 10% 20%, #1e293b, var(--bg-dark));
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .role-title {
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, #60a5fa, #a855f7);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+  font-size: clamp(2rem, 6vw, 2.8rem);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  background: linear-gradient(145deg, #60a5fa, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .role-subtitle {
-    color: #94a3b8;
-    margin-bottom: 3rem;
-    font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 3rem;
+  font-size: 1.2rem;
+  font-weight: 300;
+  text-align: center;
 }
 
 .role-cards {
-    display: flex;
-    gap: 2rem;
-    flex-wrap: wrap;
-    justify-content: center;
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .role-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 2rem;
-    width: 280px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-light);
+  border-radius: 28px;
+  padding: 2.5rem 1.8rem;
+  width: 300px;
+  max-width: 100%;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.25s ease, background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  box-shadow: 0 20px 30px -15px rgba(0, 0, 0, 0.4);
 }
 
 .role-card:hover {
-    transform: translateY(-5px);
-    background: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-    border-color: rgba(96, 165, 250, 0.4);
+  transform: translateY(-8px);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--primary-glow);
+  box-shadow: 0 30px 40px -18px var(--primary);
 }
 
 .role-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
+  font-size: 4.2rem;
+  margin-bottom: 1.2rem;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.role-card:hover .role-icon {
+  transform: scale(1.1) rotate(2deg);
 }
 
 .role-card h2 {
-    margin-bottom: 0.5rem;
-    font-size: 1.5rem;
+  font-size: 1.9rem;
+  font-weight: 500;
+  margin-bottom: 0.6rem;
+  letter-spacing: -0.02em;
+  color: white;
 }
 
 .role-card p {
-    color: #cbd5e1;
-    font-size: 0.9rem;
-    line-height: 1.5;
+  color: #cbd5e1;
+  font-size: 1rem;
+  line-height: 1.6;
+  font-weight: 300;
+  margin: 0;
 }
 
-.citizen-card:hover .role-icon {
-    transform: scale(1.1);
-    transition: transform 0.2s;
+.login-prompt {
+  margin-top: 3rem;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
 }
 
-.officer-card:hover .role-icon {
-    transform: scale(1.1);
-    transition: transform 0.2s;
+.login-link {
+  color: var(--primary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.login-link:hover {
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .role-card {
+    width: 100%;
+    padding: 2rem 1.5rem;
+  }
+  .role-cards {
+    gap: 1.5rem;
+  }
 }

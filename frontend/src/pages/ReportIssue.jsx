@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import '../styles/ReportIssue.css';
-
 import { useTranslation } from 'react-i18next';
+import '../styles/ReportIssue.css';
 
 const ReportIssue = () => {
     const { t } = useTranslation();
@@ -12,14 +11,13 @@ const ReportIssue = () => {
     // State
     const [stream, setStream] = useState(null);
     const [cameraError, setCameraError] = useState('');
-    const [capturedImage, setCapturedImage] = useState(null); // base64
+    const [capturedImage, setCapturedImage] = useState(null);
     const [location, setLocation] = useState(null);
     const [locationError, setLocationError] = useState('');
     const [description, setDescription] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [voiceLanguage, setVoiceLanguage] = useState('en-IN');
     const [hasRecordedVoice, setHasRecordedVoice] = useState(false);
-    // const [category, setCategory] = useState(''); // Removed for AI detection
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Refs
@@ -27,12 +25,9 @@ const ReportIssue = () => {
     const canvasRef = useRef(null);
     const recognitionRef = useRef(null);
 
-    // 1. Initialize Camera & GPS on Mount
     useEffect(() => {
         startCamera();
         getLocation();
-
-        // Cleanup
         return () => {
             stopCamera();
         };
@@ -43,7 +38,7 @@ const ReportIssue = () => {
     const startCamera = async () => {
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' } // Prefer back camera
+                video: { facingMode: 'environment' }
             });
             setStream(mediaStream);
             if (videoRef.current) {
@@ -82,7 +77,7 @@ const ReportIssue = () => {
         );
     };
 
-    // 2. Capture Photo & Embed Metadata
+    // Capture Photo
     const capturePhoto = () => {
         if (!videoRef.current || !canvasRef.current || !location) return;
 
@@ -90,11 +85,8 @@ const ReportIssue = () => {
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
 
-        // Set canvas dimensions to match video
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // Draw video frame
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Embed Metadata
@@ -102,22 +94,18 @@ const ReportIssue = () => {
         const timestamp = date.toLocaleString();
         const locString = `Lat: ${location.lat.toFixed(6)}, Lng: ${location.lng.toFixed(6)}`;
 
-        // Overlay text styles
-        context.globalAlpha = 0.6;
+        context.globalAlpha = 0.7;
         context.fillStyle = "black";
         context.fillRect(10, canvas.height - 80, canvas.width - 20, 70);
         context.globalAlpha = 1.0;
 
-        context.font = "20px Arial";
+        context.font = "18px Arial";
         context.fillStyle = "white";
-        context.fillText(`Date: ${timestamp}`, 20, canvas.height - 55);
-        context.fillText(locString, 20, canvas.height - 25);
+        context.fillText(`📅 ${timestamp}`, 20, canvas.height - 50);
+        context.fillText(`📍 ${locString}`, 20, canvas.height - 25);
 
-        // Save as base64
         const dataUrl = canvas.toDataURL('image/png');
         setCapturedImage(dataUrl);
-
-        // Stop stream after capture to save battery/processing
         stopCamera();
     };
 
@@ -126,7 +114,7 @@ const ReportIssue = () => {
         startCamera();
     };
 
-    // 3. Voice Input Logic
+    // Voice Input
     const startListening = () => {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
             alert("Your browser does not support speech recognition.");
@@ -172,7 +160,7 @@ const ReportIssue = () => {
         else startListening();
     };
 
-    // 4. Submit Logic
+    // Submit
     const canSubmit = capturedImage &&
         location &&
         description.trim().length > 0 &&
@@ -186,11 +174,10 @@ const ReportIssue = () => {
             image: capturedImage,
             voiceText: description,
             language: voiceLanguage,
-            // issueCategory: Auto-detected by AI
             latitude: location.lat,
             longitude: location.lng,
             timestamp: new Date().toISOString(),
-            citizenId: "FROM_JWT_MIDDLEWARE", // Backend should extract this
+            citizenId: "FROM_JWT_MIDDLEWARE",
             status: "Reported"
         };
 
@@ -203,7 +190,7 @@ const ReportIssue = () => {
             });
 
             console.log("Submission Success:", response.data);
-            alert(response.data.message || "Issue reported successfully!"); // Show tailored message (Duplicate/Flagged/Success)
+            alert(response.data.message || "Issue reported successfully!");
             navigate('/dashboard');
 
         } catch (error) {
@@ -216,122 +203,295 @@ const ReportIssue = () => {
     };
 
     return (
-        <div className="report-container">
-            <div className="dashboard-header">
-                <h1>{t('report_new_issue')}</h1>
-                <button className="btn btn-secondary" onClick={() => navigate('/dashboard')}>{t('cancel')}</button>
-            </div>
-
-            {/* 1. Camera Section */}
-            <section className="camera-section">
-                <h2 className="section-title">📸 {t('capture_evidence')}</h2>
-                <div className="media-container">
-                    {!capturedImage && !stream && !cameraError && (
-                        <div className="loading-overlay">{t('initializing_camera')}</div>
-                    )}
-
-                    {cameraError && (
-                        <div className="loading-overlay" style={{ background: '#333' }}>
-                            {cameraError}
-                        </div>
-                    )}
-
-                    {/* Live Video */}
-                    <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        style={{ display: capturedImage ? 'none' : 'block' }}
-                    />
-
-                    {/* Image Preview (Canvas) */}
-                    <canvas
-                        ref={canvasRef}
-                        style={{ display: capturedImage ? 'block' : 'none' }}
-                    />
-
-                    {/* Capture Button */}
-                    {!capturedImage && stream && (
-                        <button className="capture-btn" onClick={capturePhoto} title="Capture Photo"></button>
-                    )}
-                </div>
-
-                {capturedImage && (
-                    <button className="retake-btn btn" onClick={retakePhoto}>{t('retake_photo')}</button>
-                )}
-            </section>
-
-            {/* 2. Details Section */}
-            <section className="form-section">
-
-                {/* Location Status */}
-                <div className="mb-4">
-                    {location ? (
-                        <span className="location-badge">
-                            📍 {t('location_fetched')}: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                        </span>
-                    ) : (
-                        <span style={{ color: 'var(--error-color)' }}>
-                            {locationError || `📍 ${t('fetching_location')}`}
-                        </span>
-                    )}
-                </div>
-
-                {/* Voice Input */}
-                <h2 className="section-title">🎤 {t('describe_issue')}</h2>
-                <div className="input-group">
-                    <div className="voice-controls">
-                        <select
-                            className="input-field"
-                            style={{ width: '120px' }}
-                            value={voiceLanguage}
-                            onChange={(e) => setVoiceLanguage(e.target.value)}
-                        >
-                            <option value="en-IN">English</option>
-                            <option value="hi-IN">Hindi</option>
-                            <option value="te-IN">Telugu</option>
-                        </select>
-
-                        <button
-                            className={`mic-btn ${isListening ? 'listening' : ''}`}
-                            onClick={toggleListening}
-                            title="Tap to Speak"
-                        >
-                            {isListening ? '⏹️' : '🎙️'}
+        <div className="report-issue-page">
+            {/* Official Government Header */}
+            <header className="gov-header">
+                <div className="gov-header-content">
+                    <div className="gov-emblem">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" />
+                            <path d="M2 17L12 22L22 17" />
+                            <path d="M2 12L12 17L22 12" />
+                        </svg>
+                    </div>
+                    
+                    <div className="gov-header-title-section">
+                        <h1 className="gov-title">CivicFix Citizen Portal</h1>
+                        <p className="gov-subtitle">Report Civic Issue</p>
+                    </div>
+                    
+                    <div className="gov-header-actions">
+                        <button className="btn btn-secondary no-print" onClick={() => navigate('/dashboard')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                            </svg>
+                            Cancel
                         </button>
+                    </div>
+                </div>
+            </header>
 
-                        <span className="voice-status">
-                            {isListening ? t('listening') : (hasRecordedVoice ? `${t('voice_recorded')} ✅` : t('tap_mic'))}
-                        </span>
+            <main className="report-container">
+                {/* Progress Steps */}
+                <section className="progress-section">
+                    <div className="progress-steps">
+                        <div className={`progress-step ${capturedImage ? 'completed' : 'active'}`}>
+                            <div className="step-circle">
+                                {capturedImage ? '✓' : '1'}
+                            </div>
+                            <div className="step-label">Capture Photo</div>
+                        </div>
+                        <div className="progress-line"></div>
+                        <div className={`progress-step ${location ? 'completed' : capturedImage ? 'active' : ''}`}>
+                            <div className="step-circle">
+                                {location ? '✓' : '2'}
+                            </div>
+                            <div className="step-label">Location</div>
+                        </div>
+                        <div className="progress-line"></div>
+                        <div className={`progress-step ${description ? 'completed' : location && capturedImage ? 'active' : ''}`}>
+                            <div className="step-circle">
+                                {description ? '✓' : '3'}
+                            </div>
+                            <div className="step-label">Description</div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Camera Section */}
+                <section className="dashboard-section">
+                    <div className="section-header">
+                        <h2 className="section-title">Capture Evidence</h2>
+                        <p className="section-subtitle">Take a clear photo of the civic issue you want to report</p>
                     </div>
 
-                    <textarea
-                        className="input-field"
-                        placeholder={t('type_description')}
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        style={{ minHeight: '80px' }}
-                    />
-                </div>
+                    <div className="camera-card">
+                        <div className="media-container">
+                            {!capturedImage && !stream && !cameraError && (
+                                <div className="loading-overlay">
+                                    <div className="spinner"></div>
+                                    <p>Initializing camera...</p>
+                                </div>
+                            )}
 
+                            {cameraError && (
+                                <div className="error-overlay">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <line x1="15" y1="9" x2="9" y2="15"/>
+                                        <line x1="9" y1="9" x2="15" y2="15"/>
+                                    </svg>
+                                    <p>{cameraError}</p>
+                                </div>
+                            )}
 
+                            <video
+                                ref={videoRef}
+                                autoPlay
+                                playsInline
+                                muted
+                                style={{ display: capturedImage ? 'none' : 'block' }}
+                            />
 
-                {/* Submit */}
-                <button
-                    className="btn btn-primary submit-btn"
-                    onClick={handleSubmit}
-                    disabled={!canSubmit}
-                >
-                    {isSubmitting ? t('submitting') : t('submit_report')}
-                </button>
+                            <canvas
+                                ref={canvasRef}
+                                style={{ display: capturedImage ? 'block' : 'none' }}
+                            />
 
-                {!canSubmit && (
-                    <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
-                        {t('required_fields')}
-                    </p>
-                )}
-            </section>
+                            {!capturedImage && stream && (
+                                <button className="capture-btn" onClick={capturePhoto} title="Capture Photo">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                        <circle cx="12" cy="13" r="4"/>
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+
+                        {capturedImage && (
+                            <div className="camera-actions">
+                                <button className="btn btn-secondary" onClick={retakePhoto}>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M1 4v6h6M23 20v-6h-6"/>
+                                        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                                    </svg>
+                                    Retake Photo
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* Location Section */}
+                <section className="dashboard-section">
+                    <div className="section-header">
+                        <h2 className="section-title">Location Information</h2>
+                        <p className="section-subtitle">GPS coordinates will be automatically attached to your report</p>
+                    </div>
+
+                    <div className="location-card">
+                        {location ? (
+                            <div className="location-success">
+                                <div className="location-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                </div>
+                                <div className="location-details">
+                                    <div className="location-status">Location Captured</div>
+                                    <div className="location-coords">
+                                        <span>Lat: {location.lat.toFixed(6)}</span>
+                                        <span className="coord-divider">•</span>
+                                        <span>Lng: {location.lng.toFixed(6)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="location-loading">
+                                <div className="location-icon">
+                                    <div className="spinner-small"></div>
+                                </div>
+                                <div className="location-details">
+                                    <div className="location-status">
+                                        {locationError || 'Fetching your location...'}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* Description Section */}
+                <section className="dashboard-section">
+                    <div className="section-header">
+                        <h2 className="section-title">Issue Description</h2>
+                        <p className="section-subtitle">Describe the civic issue in your own words or use voice input</p>
+                    </div>
+
+                    <div className="description-card">
+                        {/* Voice Controls */}
+                        <div className="voice-controls-row">
+                            <div className="language-selector">
+                                <label>Language</label>
+                                <select
+                                    className="input-field"
+                                    value={voiceLanguage}
+                                    onChange={(e) => setVoiceLanguage(e.target.value)}
+                                >
+                                    <option value="en-IN">🇮🇳 English</option>
+                                    <option value="hi-IN">🇮🇳 हिंदी (Hindi)</option>
+                                    <option value="te-IN">🇮🇳 తెలుగు (Telugu)</option>
+                                    <option value="ta-IN">🇮🇳 தமிழ் (Tamil)</option>
+                                    <option value="mr-IN">🇮🇳 मराठी (Marathi)</option>
+                                </select>
+                            </div>
+
+                            <div className="voice-button-container">
+                                <button
+                                    className={`voice-btn ${isListening ? 'listening' : ''}`}
+                                    onClick={toggleListening}
+                                    title={isListening ? "Stop Recording" : "Start Voice Input"}
+                                >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        {isListening ? (
+                                            <>
+                                                <rect x="9" y="2" width="6" height="20" rx="3"/>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                                <line x1="12" y1="19" x2="12" y2="23"/>
+                                                <line x1="8" y1="23" x2="16" y2="23"/>
+                                            </>
+                                        )}
+                                    </svg>
+                                    {isListening ? 'Stop' : 'Speak'}
+                                </button>
+                                {hasRecordedVoice && !isListening && (
+                                    <span className="voice-badge">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                            <polyline points="22 4 12 14.01 9 11.01"/>
+                                        </svg>
+                                        Voice Recorded
+                                    </span>
+                                )}
+                                {isListening && (
+                                    <span className="voice-status-listening">
+                                        <span className="pulse-dot"></span>
+                                        Listening...
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Text Input */}
+                        <div className="text-input-container">
+                            <textarea
+                                className="input-field"
+                                placeholder="Type or speak your description here... (e.g., 'Broken street light on Main Road near market')"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                rows={5}
+                            />
+                            <div className="character-count">
+                                {description.length} characters
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Submit Section */}
+                <section className="dashboard-section">
+                    <div className="submit-card">
+                        <button
+                            className="btn-submit-large"
+                            onClick={handleSubmit}
+                            disabled={!canSubmit}
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <div className="spinner-small"></div>
+                                    Submitting Report...
+                                </>
+                            ) : (
+                                <>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M22 2L11 13"/>
+                                        <path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+                                    </svg>
+                                    Submit Report
+                                </>
+                            )}
+                        </button>
+
+                        {!canSubmit && (
+                            <div className="requirements-list">
+                                <div className="requirement-item">
+                                    <div className={`requirement-status ${capturedImage ? 'completed' : 'pending'}`}>
+                                        {capturedImage ? '✓' : '○'}
+                                    </div>
+                                    <span>Photo captured</span>
+                                </div>
+                                <div className="requirement-item">
+                                    <div className={`requirement-status ${location ? 'completed' : 'pending'}`}>
+                                        {location ? '✓' : '○'}
+                                    </div>
+                                    <span>Location detected</span>
+                                </div>
+                                <div className="requirement-item">
+                                    <div className={`requirement-status ${description.trim() ? 'completed' : 'pending'}`}>
+                                        {description.trim() ? '✓' : '○'}
+                                    </div>
+                                    <span>Description provided</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </section>
+            </main>
         </div>
     );
 };

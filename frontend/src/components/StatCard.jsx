@@ -1,32 +1,28 @@
 import React from 'react';
-import { Card, CardContent, Typography, Box } from '@mui/material';
+import './StatCard.css';
 
-const StatCard = ({ title, value, subtext, icon, color = 'primary.main' }) => {
+const StatCard = ({ title, value, subtext, icon, color = '#1565c0', trend, trendValue }) => {
     return (
-        <Card sx={{ height: '100%', boxShadow: 3, borderLeft: `5px solid`, borderColor: color }}>
-            <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Box>
-                        <Typography color="textSecondary" gutterBottom variant="subtitle2">
-                            {title}
-                        </Typography>
-                        <Typography variant="h4" component="div" fontWeight="bold">
-                            {value}
-                        </Typography>
-                        {subtext && (
-                            <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                                {subtext}
-                            </Typography>
-                        )}
-                    </Box>
-                    {icon && (
-                        <Box sx={{ color: color, opacity: 0.8 }}>
-                            {icon}
-                        </Box>
+        <div className="stat-card" style={{ '--card-color': color }}>
+            <div className="stat-card-header">
+                <div className="stat-card-title-section">
+                    <h3 className="stat-card-title">{title}</h3>
+                    {trend && (
+                        <span className={`stat-trend stat-trend-${trend}`}>
+                            {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'} {trendValue}
+                        </span>
                     )}
-                </Box>
-            </CardContent>
-        </Card>
+                </div>
+                {icon && (
+                    <div className="stat-card-icon" style={{ color: color }}>
+                        {icon}
+                    </div>
+                )}
+            </div>
+            <div className="stat-card-value">{value}</div>
+            {subtext && <div className="stat-card-subtext">{subtext}</div>}
+            <div className="stat-card-accent"></div>
+        </div>
     );
 };
 

@@ -1,0 +1,155 @@
+.stat-card {
+    position: relative;
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    transform: translateY(-4px);
+    border-color: var(--card-color, #1565c0);
+}
+
+.stat-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.stat-card-title-section {
+    flex: 1;
+}
+
+.stat-card-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #616161;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+    margin-bottom: 0.25rem;
+}
+
+.stat-card-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, 
+        color-mix(in srgb, var(--card-color, #1565c0) 10%, transparent),
+        color-mix(in srgb, var(--card-color, #1565c0) 5%, transparent)
+    );
+    border-radius: 12px;
+    font-size: 1.5rem;
+}
+
+.stat-card-value {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: #212121;
+    margin-bottom: 0.5rem;
+    font-family: 'IBM Plex Sans', sans-serif;
+    line-height: 1;
+}
+
+.stat-card-subtext {
+    font-size: 0.813rem;
+    color: #757575;
+    line-height: 1.4;
+    margin-top: auto;
+}
+
+.stat-card-accent {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, 
+        var(--card-color, #1565c0), 
+        color-mix(in srgb, var(--card-color, #1565c0) 60%, transparent)
+    );
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-card:hover .stat-card-accent {
+    transform: scaleX(1);
+}
+
+.stat-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.stat-trend-up {
+    background: rgba(46, 125, 50, 0.1);
+    color: #2e7d32;
+}
+
+.stat-trend-down {
+    background: rgba(198, 40, 40, 0.1);
+    color: #c62828;
+}
+
+.stat-trend-neutral {
+    background: rgba(97, 97, 97, 0.1);
+    color: #616161;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .stat-card {
+        padding: 1.25rem;
+    }
+    
+    .stat-card-value {
+        font-size: 1.875rem;
+    }
+    
+    .stat-card-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.25rem;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .stat-card {
+        background: #1e293b;
+        border-color: #334155;
+    }
+    
+    .stat-card-title {
+        color: #cbd5e1;
+    }
+    
+    .stat-card-value {
+        color: #f8fafc;
+    }
+    
+    .stat-card-subtext {
+        color: #94a3b8;
+    }
+    
+    .stat-card:hover {
+        border-color: var(--card-color, #1565c0);
+    }
+}

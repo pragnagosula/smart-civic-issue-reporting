@@ -10,37 +10,55 @@ const Dashboard = () => {
 
     const getLocalizedDescription = (issue) => {
         if (!issue.description) return issue.voice_text || t('no_description');
-        if (typeof issue.description === 'string') return issue.description; // fallback for legacy
+        if (typeof issue.description === 'string') return issue.description;
         return issue.description[i18n.language] || issue.description['en'] || issue.voice_text || t('no_description');
     };
 
-    // State
     const [issues, setIssues] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        total: 0,
+        resolved: 0,
+        inProgress: 0,
+        pending: 0
+    });
+    const [categoryStats, setCategoryStats] = useState({});
 
-    // Fetch issues on mount
     useEffect(() => {
-        const fetchIssues = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await axios.get('http://localhost:5000/api/issues/my-issues', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-                setIssues(response.data);
-            } catch (err) {
-                console.error("Error fetching issues:", err);
-                if (err.response?.status === 401) {
-                    navigate('/login');
-                }
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchIssues();
-    }, [navigate]);
+    }, []);
+
+    const fetchIssues = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get('http://localhost:5000/api/issues/my-issues', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const issuesData = response.data;
+            setIssues(issuesData);
+
+            setStats({
+                total: issuesData.length,
+                resolved: issuesData.filter(i => i.status === 'Resolved' || i.status === 'Closed').length,
+                inProgress: issuesData.filter(i => i.status === 'In Progress' || i.status === 'Assigned').length,
+                pending: issuesData.filter(i => i.status === 'Reported').length
+            });
+
+            const cats = {};
+            issuesData.forEach(issue => {
+                const cat = issue.category || 'Other';
+                cats[cat] = (cats[cat] || 0) + 1;
+            });
+            setCategoryStats(cats);
+        } catch (err) {
+            console.error("Error fetching issues:", err);
+            if (err.response?.status === 401) {
+                navigate('/login');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -55,72 +73,248 @@ const Dashboard = () => {
         navigate('/citizen/profile');
     };
 
+    const isOverdue = (createdAt) => {
+        const created = new Date(createdAt);
+        const now = new Date();
+        const diffDays = (now - created) / (1000 * 60 * 60 * 24);
+        return diffDays > 7;
+    };
+
+    const getCategoryIcon = (category) => {
+        switch(category) {
+            case 'Street Lighting': return '💡';
+            case 'Water Supply': return '💧';
+            case 'Road Damage': return '🛣️';
+            case 'Garbage': return '🗑️';
+            case 'Roads': return '🛣️';
+            case 'Sanitation': return '🧹';
+            case 'Drainage': return '🌊';
+            case 'Parks': return '🌳';
+            case 'Solid Waste Management': return '♻️';
+            default: return '📌';
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="loading-overlay">
+                <div className="spinner"></div>
+                <p style={{ marginTop: '1.5rem', color: '#616161', fontSize: '1rem' }}>Loading Dashboard...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="dashboard-container">
-            {/* 3. Logout Element (placed in header for standard UI pattern) */}
-            <header className="dashboard-header">
-                <h1>{t('citizen_dashboard')}</h1>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <button className="logout-btn" onClick={handleProfile} style={{ backgroundColor: '#2196f3' }}>
-                        {t('my_profile')}
-                    </button>
-                    <button className="logout-btn" onClick={handleLogout}>
-                        {t('logout')}
-                    </button>
+        <div className="citizen-dashboard">
+            {/* Official Government Header */}
+            <header className="gov-header">
+                <div className="gov-header-content">
+                    <div className="gov-emblem">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" />
+                            <path d="M2 17L12 22L22 17" />
+                            <path d="M2 12L12 17L22 12" />
+                        </svg>
+                    </div>
+                    
+                    <div className="gov-header-title-section">
+                        <h1 className="gov-title">CivicFix Citizen Portal</h1>
+                        <p className="gov-subtitle">Government of India | Civic Issue Management</p>
+                    </div>
+                    
+                    <div className="gov-header-actions">
+                        <button className="btn btn-profile no-print" onClick={handleProfile}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                <circle cx="12" cy="7" r="4" />
+                            </svg>
+                            Profile
+                        </button>
+                        <button className="btn btn-logout no-print" onClick={handleLogout}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                <polyline points="16 17 21 12 16 7" />
+                                <line x1="21" y1="12" x2="9" y2="12" />
+                            </svg>
+                            Logout
+                        </button>
+                    </div>
                 </div>
             </header>
 
-            <main>
-                {/* 1. Report New Issue Element */}
-                <section className="action-section">
-                    <button className="report-btn-large" onClick={handleReportIssue}>
-                        <span className="report-icon">+</span>
-                        {t('report_new_issue')}
-                    </button>
+            <main className="dashboard-container">
+                {/* System Overview Statistics */}
+                <section className="dashboard-section">
+                    <div className="section-header">
+                        <h2 className="section-title">Dashboard Overview</h2>
+                        <p className="section-subtitle">Summary of your reported civic issues and their current status</p>
+                    </div>
+
+                    <div className="stats-grid">
+                        <article className="stat-card stat-card-primary">
+                            <div className="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-value">{stats.total}</div>
+                                <div className="stat-label">Total Issues</div>
+                                <div className="stat-meta">all time</div>
+                            </div>
+                        </article>
+
+                        <article className="stat-card stat-card-success">
+                            <div className="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                    <polyline points="22 4 12 14.01 9 11.01" />
+                                </svg>
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-value">{stats.resolved}</div>
+                                <div className="stat-label">Resolved</div>
+                                <div className="stat-meta">completed</div>
+                            </div>
+                        </article>
+
+                        <article className="stat-card stat-card-warning">
+                            <div className="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <path d="M12 6v6l4 2" />
+                                </svg>
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-value">{stats.inProgress}</div>
+                                <div className="stat-label">In Progress</div>
+                                <div className="stat-meta">being worked on</div>
+                            </div>
+                        </article>
+
+                        <article className="stat-card stat-card-info">
+                            <div className="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="16" x2="12" y2="12" />
+                                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                                </svg>
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-value">{stats.pending}</div>
+                                <div className="stat-label">Pending</div>
+                                <div className="stat-meta">awaiting assignment</div>
+                            </div>
+                        </article>
+                    </div>
                 </section>
 
-                {/* 2. My Reported Issues Element */}
-                <section className="issues-section">
-                    <h2>{t('my_reported_issues')}</h2>
+                {/* Category Breakdown */}
+                {Object.keys(categoryStats).length > 0 && (
+                    <section className="dashboard-section">
+                        <div className="section-header">
+                            <h2 className="section-title">Issues by Category</h2>
+                            <p className="section-subtitle">Breakdown of your reports by issue type</p>
+                        </div>
 
-                    {loading ? (
-                        <p>{t('loading_issues')}</p>
-                    ) : issues.length === 0 ? (
-                        <div className="empty-state">
-                            <p>{t('no_issues')}</p>
+                        <div className="category-cards-grid">
+                            {Object.entries(categoryStats).map(([cat, count]) => (
+                                <div key={cat} className="category-card">
+                                    <div className="category-card-icon">{getCategoryIcon(cat)}</div>
+                                    <div className="category-card-content">
+                                        <div className="category-card-name">{cat}</div>
+                                        <div className="category-card-count">{count} {count === 1 ? 'issue' : 'issues'}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Report New Issue CTA */}
+                <section className="dashboard-section">
+                    <div className="cta-container">
+                        <button className="btn-report-large" onClick={handleReportIssue}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            Report New Issue
+                        </button>
+                    </div>
+                </section>
+
+                {/* My Reported Issues */}
+                <section className="dashboard-section">
+                    <div className="section-header">
+                        <h2 className="section-title">My Reported Issues</h2>
+                        <p className="section-subtitle">Track and manage all your submitted civic issue reports</p>
+                    </div>
+
+                    {issues.length === 0 ? (
+                        <div className="empty-state-card">
+                            <div className="empty-state-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                            </div>
+                            <h3 className="empty-state-title">No Issues Reported Yet</h3>
+                            <p className="empty-state-text">Start by reporting your first civic issue to help improve your community</p>
+                            <button className="btn btn-primary" onClick={handleReportIssue}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                                Report Your First Issue
+                            </button>
                         </div>
                     ) : (
-                        <div className="issues-list">
+                        <div className="issues-grid">
                             {issues.map((issue) => (
-                                <div
+                                <article
                                     key={issue.id}
                                     className="issue-card"
                                     onClick={() => navigate(`/issue/${issue.id}`)}
-                                    style={{ cursor: 'pointer' }}
-                                    title="Click to view details"
                                 >
-                                    <div className="issue-info">
-                                        <h3>{t('cat_' + (issue.category === 'Street Lighting' ? 'lighting' : issue.category === 'Water Supply' ? 'water' : issue.category.toLowerCase()), { defaultValue: issue.category })}</h3>
-                                        <p style={{ margin: '5px 0', fontSize: '0.9rem', color: '#cbd5e1' }}>
-                                            {getLocalizedDescription(issue)}
-                                        </p>
+                                    <div className="issue-card-header">
+                                        <div className="issue-category">
+                                            <span className="category-icon-small">{getCategoryIcon(issue.category)}</span>
+                                            <span className="category-text">{issue.category}</span>
+                                        </div>
+                                        <div className="issue-id">#{issue.id}</div>
+                                    </div>
+
+                                    <div className="issue-description">
+                                        {getLocalizedDescription(issue)}
+                                    </div>
+
+                                    <div className="issue-footer">
                                         <div className="issue-meta">
-                                            <span>{new Date(issue.timestamp.endsWith('Z') ? issue.timestamp : issue.timestamp + 'Z').toLocaleDateString()}</span>
-                                            <span>•</span>
-                                            <span>{new Date(issue.timestamp.endsWith('Z') ? issue.timestamp : issue.timestamp + 'Z').toLocaleTimeString()}</span>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <path d="M12 6v6l4 2" />
+                                            </svg>
+                                            <span>{new Date(issue.timestamp?.endsWith('Z') ? issue.timestamp : issue.timestamp + 'Z').toLocaleDateString('en-IN')}</span>
+                                        </div>
+                                        <div className="issue-status-container">
+                                            <span className={`status-badge 
+                                                ${issue.status === 'Reported' && isOverdue(issue.created_at || issue.timestamp) 
+                                                    ? 'status-overdue' 
+                                                    : `status-${(issue.status || 'Reported').toLowerCase().replace(' ', '-')}`}`}>
+                                                {issue.status === 'Reported' && isOverdue(issue.created_at || issue.timestamp) 
+                                                    ? 'OVERDUE' 
+                                                    : (issue.status || 'Reported').toUpperCase()}
+                                            </span>
+                                            {issue.ai_status && (
+                                                <span className={`ai-badge ai-${issue.ai_status.toLowerCase()}`}>
+                                                    🤖 {issue.ai_status}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
-                                    <div className="issue-status">
-                                        <span className={`status-badge status-${(issue.status || 'Reported').toLowerCase().replace(' ', '-')}`}>
-                                            {t('status_' + (issue.status || 'Reported').toLowerCase().replace(' ', ''), { defaultValue: issue.status })}
-                                        </span>
-                                        {issue.ai_status && (
-                                            <span className={`status-badge status-${issue.ai_status.toLowerCase()}`} style={{ marginLeft: '8px', background: issue.ai_status === 'Verified' ? '#dcfce7' : '#fee2e2', color: issue.ai_status === 'Verified' ? '#166534' : '#991b1b' }}>
-                                                🤖 {issue.ai_status}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
+                                </article>
                             ))}
                         </div>
                     )}

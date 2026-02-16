@@ -1,9 +1,7 @@
 const sql = require('../db');
 const axios = require('axios');
 const fs = require('fs');
-const pdf = require('pdf-parse');
 const cloudinary = require('cloudinary').v2;
-const Tesseract = require('tesseract.js');
 const { sendNotification } = require('../services/notificationService');
 const { sendEmail } = require('../utils/emailService');
 
@@ -15,97 +13,86 @@ cloudinary.config({
 });
 
 // ==============================
-// OFFICER REGISTRATION
+// OFFICER REGISTRATION (BASIC VERSION - Works without OCR service)
 // ==============================
-exports.registerOfficer = async (req, res) => {
+const registerOfficer = async (req, res) => {
     const file = req.file;
-    console.log("Register Officer: Request received");
+    console.log("\n========================================");
+    console.log("📝 OFFICER REGISTRATION REQUEST");
+    console.log("========================================");
 
     try {
         const { name, email, phone, department, designation } = req.body;
-        console.log("Parsed body:", { name, email, phone, department, designation });
-        console.log("File details:", file ? { path: file.path, mimetype: file.mimetype, size: file.size } : "No file");
+        console.log("📋 Request Details:");
+        console.log(`   Name: ${name}`);
+        console.log(`   Email: ${email}`);
+        console.log(`   Department: ${department}`);
+
+        if (file) {
+            console.log("\n📎 Document Details:");
+            console.log(`   Filename: ${file.originalname}`);
+            console.log(`   Type: ${file.mimetype}`);
+            console.log(`   Size: ${(file.size / 1024).toFixed(2)} KB`);
+        }
 
         // 1️⃣ Validate input
         if (!file) {
+            console.log("❌ No document uploaded");
             return res.status(400).json({ message: 'Supporting document is required' });
         }
 
-        console.log("Checking if user exists...");
+        // 2️⃣ Check if user exists
+        console.log("\n🔍 Checking for existing user...");
         const userCheck = await sql`SELECT 1 FROM users WHERE email = ${email}`;
         if (userCheck.length > 0) {
-            console.log("User already exists.");
-            try { fs.unlinkSync(file.path); } catch (e) { console.error("Failed to delete temp file:", e); }
+            console.log("❌ User already exists");
+            try { fs.unlinkSync(file.path); } catch (e) { }
             return res.status(400).json({ message: 'Officer already registered with this email' });
         }
+        console.log("✅ Email available");
 
-        // 2️⃣ EXTRACT TEXT FIRST (IMPORTANT)
-        console.log("Starting text extraction...");
-        let extractedText = "";
-
-        if (file.mimetype === 'application/pdf') {
-            try {
-                const buffer = fs.readFileSync(file.path);
-                const data = await pdf(buffer);
-                extractedText = data.text || "";
-                console.log("PDF text length:", extractedText.length);
-            } catch (err) {
-                console.error("PDF parse error:", err.message);
-            }
-        }
-
-        // 3️⃣ OCR FALLBACK (for scanned PDFs / images)
-        if (!extractedText || extractedText.trim().length < 50) {
-            console.log("Running OCR fallback...");
-            try {
-                const ocrResult = await Tesseract.recognize(file.path, "eng");
-                extractedText = ocrResult.data.text || "";
-                console.log("OCR text length:", extractedText.length);
-            } catch (err) {
-                console.error("OCR failed:", err.message);
-            }
-        }
-
-        // 4️⃣ HARD VALIDATION
-        if (!extractedText || extractedText.trim().length < 100) {
-            console.log("Text extraction failed or insufficient text.");
-            return res.status(400).json({
-                message: "Document content is not readable. Please upload a clear text-based PDF."
-            });
-        }
-
-        // 5️⃣ Upload to Cloudinary (AFTER extraction)
-        console.log("Uploading to Cloudinary...");
+        // 3️⃣ Upload to Cloudinary
+        console.log("\n☁️  Uploading to Cloudinary...");
         let documentUrl;
         try {
             const uploadResult = await cloudinary.uploader.upload(file.path, {
                 folder: 'officer_documents',
-                resource_type: 'auto'
+                resource_type: 'auto',
+                context: `name=${name}|department=${department}`,
+                tags: ['officer_registration', department]
             });
             documentUrl = uploadResult.secure_url;
-            console.log("Cloudinary Upload Success:", documentUrl);
-            try { fs.unlinkSync(file.path); } catch (e) { console.error("Failed to delete temp file:", e); }
-        } catch (err) {
-            console.error("Cloudinary upload failed:", err.message);
-            return res.status(500).json({ message: "Document upload failed: " + err.message });
+            console.log("✅ Upload successful");
+            console.log(`   URL: ${documentUrl}`);
+            
+            // Clean up temp file
+            try { fs.unlinkSync(file.path); } catch (e) { }
+        } catch (uploadError) {
+            console.error("❌ Cloudinary upload failed:", uploadError.message);
+            try { fs.unlinkSync(file.path); } catch (e) { }
+            return res.status(500).json({ 
+                message: "Document upload failed. Please try again.",
+                error: uploadError.message 
+            });
         }
 
-        // 6️⃣ AI Screening
-        console.log("Calling AI Service...");
+        // 4️⃣ AI Screening (Optional - defaults to PENDING if service unavailable)
+        console.log("\n🤖 Attempting AI Screening...");
         let aiResult = {
-            ai_score: 0,
-            ai_result: "NOT_CHECKED",
-            ai_reason: "AI Service Unavailable"
+            ai_score: 0.5,
+            ai_result: "PENDING_REVIEW",
+            ai_reason: "Manual admin review required"
         };
 
         try {
             const aiPayload = {
-                text: extractedText,
+                text: "Document uploaded for verification",
                 department,
                 designation: designation || "Officer",
                 document_url: documentUrl
             };
 
+            console.log("📤 Sending to AI service...");
             const aiResponse = await axios.post(
                 "http://localhost:8000/screen-officer",
                 aiPayload,
@@ -113,64 +100,114 @@ exports.registerOfficer = async (req, res) => {
             );
 
             aiResult = aiResponse.data;
-            console.log("AI Result:", aiResult);
+            console.log("✅ AI screening complete");
+            console.log(`   Score: ${aiResult.ai_score}`);
+            console.log(`   Result: ${aiResult.ai_result}`);
 
-        } catch (err) {
-            console.error("AI call failed:", err.message);
-            // We don't block registration if AI fails, just log it.
+        } catch (aiError) {
+            console.log("⚠️  AI service unavailable - defaulting to PENDING");
         }
 
-        // 7️⃣ Decide account status based on AI Score
+        // 5️⃣ Determine Account Status
+        console.log("\n🎯 Determining account status...");
         let accountStatus;
         let isVerified = false;
 
-        if (aiResult.ai_result === "APPROVED") {
+        if (aiResult.ai_result === "APPROVED" && aiResult.ai_score >= 0.7) {
             accountStatus = "ACTIVE";
             isVerified = true;
-        } else if (aiResult.ai_result === "PENDING_REVIEW") {
-            accountStatus = "ADMIN_REVIEW"; // 🟡 Admin only here
-            isVerified = false;
+            console.log("✅ Auto-approved");
         } else {
-            accountStatus = "REJECTED"; // ❌ No access
+            accountStatus = "PENDING";
             isVerified = false;
+            console.log("⏳ Pending admin review");
         }
 
-        // 8️⃣ Save officer
-        console.log("Inserting user into database...");
+        // 6️⃣ Save to Database
+        console.log("\n💾 Saving to database...");
         try {
             const newUser = await sql`
                 INSERT INTO users (
                     name, email, phone, role, department,
                     account_status, document_url,
                     ai_score, ai_result, ai_reason,
-                    is_verified
+                    is_verified, designation
                 ) VALUES (
                     ${name}, ${email}, ${phone}, 'officer', ${department},
                     ${accountStatus}, ${documentUrl},
                     ${aiResult.ai_score}, ${aiResult.ai_result}, ${aiResult.ai_reason},
-                    ${isVerified}
+                    ${isVerified}, ${designation || 'Officer'}
                 )
                 RETURNING *
             `;
-            console.log("User inserted successfully:", newUser[0]);
+
+            const officer = newUser[0];
+            console.log("✅ Officer registered successfully");
+            console.log(`   ID: ${officer.id}`);
+            console.log(`   Status: ${accountStatus}`);
+
+            // 7️⃣ Send Notifications
+            console.log("\n📧 Sending notifications...");
+            try {
+                // Notify officer
+                if (sendEmail) {
+                    await sendEmail(
+                        email,
+                        "CivicFix - Registration Received",
+                        `Dear ${name},\n\nYour officer registration has been received.\n\nStatus: ${accountStatus}\n\nYou will be notified once reviewed.\n\nBest regards,\nCivicFix Team`
+                    );
+                }
+
+                // Notify admin if pending
+                if (accountStatus === "PENDING" && process.env.ADMIN_EMAIL) {
+                    await sendEmail(
+                        process.env.ADMIN_EMAIL,
+                        "New Officer Registration - Review Required",
+                        `New officer registration:\n\nName: ${name}\nDepartment: ${department}\n\nPlease review in admin dashboard.`
+                    );
+                }
+                console.log("✅ Notifications sent");
+            } catch (emailError) {
+                console.log("⚠️  Email notification failed:", emailError.message);
+            }
+
+            // 🎉 Success Response
+            console.log("\n========================================");
+            console.log("✅ REGISTRATION COMPLETE");
+            console.log("========================================\n");
 
             return res.status(201).json({
-                message: "Officer registered successfully",
-                officer: newUser[0]
+                message: "Officer registration successful",
+                officer: {
+                    id: officer.id,
+                    name: officer.name,
+                    email: officer.email,
+                    department: officer.department,
+                    account_status: officer.account_status,
+                    ai_result: officer.ai_result,
+                    ai_score: officer.ai_score
+                },
+                next_steps: accountStatus === "PENDING" 
+                    ? "Your application is under review. You will be notified via email once approved."
+                    : "Your account is active! You can now login."
             });
-        } catch (dbErr) {
-            console.error("Database Insert Error:", dbErr);
-            throw new Error("Database error: " + dbErr.message);
+
+        } catch (dbError) {
+            console.error("❌ Database error:", dbError.message);
+            throw new Error("Failed to save officer registration: " + dbError.message);
         }
 
-    } catch (err) {
-        console.error("Officer registration error CRITICAL:", err);
+    } catch (error) {
+        console.error("\n❌ CRITICAL ERROR:", error.message);
+        
+        // Clean up file if it still exists
         if (file && fs.existsSync(file.path)) {
-            try { fs.unlinkSync(file.path); } catch { }
+            try { fs.unlinkSync(file.path); } catch (e) { }
         }
+
         return res.status(500).json({
-            message: "Server error: " + err.message,
-            stack: err.stack
+            message: "Registration failed due to server error",
+            error: error.message
         });
     }
 };
@@ -178,13 +215,12 @@ exports.registerOfficer = async (req, res) => {
 // ==============================
 // OFFICER ISSUE MANAGEMENT
 // ==============================
-exports.getDepartmentIssues = async (req, res) => {
+const getDepartmentIssues = async (req, res) => {
     try {
-        const { department } = req.user; // From Token
+        const { department } = req.user;
         console.log("Fetching issues for department:", department);
 
         if (!department) {
-            // Fallback: If for some reason token doesn't have dept, fetch from DB
             const user = await sql`SELECT department FROM users WHERE id = ${req.user.id}`;
             if (user.length > 0) {
                 req.user.department = user[0].department;
@@ -207,7 +243,6 @@ exports.getDepartmentIssues = async (req, res) => {
 
         const userLang = req.user.language || req.user.preferred_language || 'en';
 
-        // Helper (duplicated for now to avoid circular deps or verify if imported)
         const getLocalizedText = (obj, lang) => {
             if (!obj) return null;
             if (typeof obj === 'string') return obj;
@@ -220,7 +255,6 @@ exports.getDepartmentIssues = async (req, res) => {
                 ...issue,
                 description: desc || issue.voice_text,
                 voice_text: desc || issue.voice_text,
-                // Localize note if exists
                 resolution_note: getLocalizedText(issue.resolution_note, userLang) || issue.resolution_note
             };
         });
@@ -232,7 +266,7 @@ exports.getDepartmentIssues = async (req, res) => {
     }
 };
 
-exports.updateIssueStatus = async (req, res) => {
+const updateIssueStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
@@ -241,35 +275,24 @@ exports.updateIssueStatus = async (req, res) => {
             return res.status(400).json({ message: "Invalid status" });
         }
 
-        // Fetch Current Issue Status
         const currentIssue = await sql`SELECT status, citizen_id FROM issues WHERE id = ${id}`;
         if (currentIssue.length === 0) return res.status(404).json({ message: "Issue not found" });
         const { status: currentStatus, citizen_id: citizenId } = currentIssue[0];
 
-        // 🛡️ STATE MACHINE ENFORCEMENT
-        // Report -> Assigned (System)
-        // Assigned -> In Progress
-        // In Progress -> Resolved
-        // Resolved -> Closed (Feedback) | Reopened (Feedback)
-        // Reopened -> Assigned (System)
-
         const allowedTransitions = {
-            'Reported': ['Assigned', 'Rejected'], // Officers might pick up Reported issues directly? usually system assigns.
+            'Reported': ['Assigned', 'Rejected'],
             'Assigned': ['In Progress', 'Rejected'],
             'In Progress': ['Resolved', 'Rejected'],
-            'Resolved': [], // Officer cannot move from Resolved. Only Feedback moves it to Closed or Reopened.
-            'Reopened': ['Assigned', 'In Progress', 'Rejected'], // If reassigned to same officer, they can start.
-            'Closed': [], // Final State. No edits.
-            'Escalated': ['Assigned', 'Resolved'] // Admin might intervene
+            'Resolved': [],
+            'Reopened': ['Assigned', 'In Progress', 'Rejected'],
+            'Closed': [],
+            'Escalated': ['Assigned', 'Resolved']
         };
 
-        // Check if transition is valid
-        // Note: 'Rejected' logic is handled separately below but technically is a transition.
         if (currentStatus === 'Closed') {
             return res.status(403).json({ message: "Action Denied: Issue is permanently Closed." });
         }
 
-        // Skip check if current status is same (idempotent)
         if (currentStatus !== status) {
             const validNext = allowedTransitions[currentStatus] || [];
             if (!validNext.includes(status)) {
@@ -280,7 +303,6 @@ exports.updateIssueStatus = async (req, res) => {
             }
         }
 
-        // Special handling for REJECTED
         if (status === 'Rejected') {
             const officerId = req.user.id;
             const currentIssue = await sql`
@@ -292,11 +314,9 @@ exports.updateIssueStatus = async (req, res) => {
             const issue = currentIssue[0];
             const currentCount = (issue.rejection_count || 0) + 1;
             let rejectedBy = issue.rejected_by || [];
-            // Ensure unique
             if (!rejectedBy.includes(officerId)) rejectedBy.push(officerId);
 
             if (currentCount >= 3) {
-                // ESCALATE
                 const result = await sql`
                     UPDATE issues
                     SET status = 'Escalated', 
@@ -308,14 +328,12 @@ exports.updateIssueStatus = async (req, res) => {
                     RETURNING *
                  `;
 
-                // Notify Admin
-                if (process.env.ADMIN_EMAIL) {
+                if (process.env.ADMIN_EMAIL && sendEmail) {
                     await sendEmail(process.env.ADMIN_EMAIL, "Escalation Alert", `Issue ${id} has been rejected 3 times and is now Escalated.`);
                 }
                 return res.json({ message: "Issue Rejected. Max rejections reached -> Escalated to Admin.", issue: result[0] });
 
             } else {
-                // Auto-Reassign
                 await sql`
                     UPDATE issues
                     SET rejection_count = ${currentCount},
@@ -333,8 +351,7 @@ exports.updateIssueStatus = async (req, res) => {
                     return res.json({ message: `Issue Rejected. Reassigned to ${newOfficer.name}` });
                 } else {
                     await sql`UPDATE issues SET status = 'Escalated' WHERE id = ${id}`;
-                    // Notify Admin
-                    if (process.env.ADMIN_EMAIL) {
+                    if (process.env.ADMIN_EMAIL && sendEmail) {
                         await sendEmail(process.env.ADMIN_EMAIL, "Escalation Alert", `Issue ${id} rejected and no other officers available.`);
                     }
                     return res.json({ message: "Issue Rejected. No other officers available -> Escalated to Admin." });
@@ -342,17 +359,12 @@ exports.updateIssueStatus = async (req, res) => {
             }
 
         } else if (status === 'Resolved') {
-            // ------------------------------
-            // RESOLUTION WITH PROOF
-            // ------------------------------
             const { image, latitude, longitude } = req.body;
 
-            // 1. Validate Proof
             if (!image || !latitude || !longitude) {
                 return res.status(400).json({ message: "Resolution proof (image) and location are required." });
             }
 
-            // 2. Upload Proof Image to Cloudinary
             let resolutionImageUrl = '';
             try {
                 if (image.startsWith('data:image')) {
@@ -362,16 +374,13 @@ exports.updateIssueStatus = async (req, res) => {
                     });
                     resolutionImageUrl = uploadResult.secure_url;
                 } else {
-                    resolutionImageUrl = image; // Should not happen in normal flow
+                    resolutionImageUrl = image;
                 }
             } catch (err) {
                 console.error('Resolution Image upload failed:', err.message);
                 return res.status(500).json({ message: 'Failed to upload resolution document.' });
             }
 
-            // 3. Update Database with Proof Metadata
-            // - resolved_at = Server Time (NOW())
-            // - resolution_lat/lng = Officer Location
             const result = await sql`
                 UPDATE issues
                 SET 
@@ -389,13 +398,11 @@ exports.updateIssueStatus = async (req, res) => {
 
             if (result.length === 0) return res.status(404).json({ message: "Issue not found" });
 
-            // 4. Notify ALL Linked Citizens (Reporter + Crowdsourced)
             try {
                 const linkedCitizens = await sql`
                     SELECT DISTINCT citizen_id FROM issue_citizens WHERE issue_id = ${id}
                 `;
 
-                // If the table is empty (legacy issues), fallback to the main citizenId
                 const recipients = linkedCitizens.length > 0 ? linkedCitizens.map(r => r.citizen_id) : (citizenId ? [citizenId] : []);
 
                 for (const citId of recipients) {
@@ -408,7 +415,6 @@ exports.updateIssueStatus = async (req, res) => {
             res.json({ message: "Issue resolved with proof", issue: result[0] });
 
         } else {
-            // Normal Status Update (In Progress)
             const result = await sql`
                 UPDATE issues
                 SET status = ${status}, updated_at = NOW(), assigned_officer_id = ${req.user.id}
@@ -417,7 +423,6 @@ exports.updateIssueStatus = async (req, res) => {
             `;
             if (result.length === 0) return res.status(404).json({ message: "Issue not found" });
 
-            // Notifications
             if (citizenId) {
                 if (status === 'In Progress') {
                     await sendNotification(citizenId, "Work Started", "Work has started on your issue.");
@@ -431,4 +436,13 @@ exports.updateIssueStatus = async (req, res) => {
         console.error("Update Issue Status Error:", err);
         res.status(500).json({ message: "Server error" });
     }
+};
+
+// ==============================
+// CRITICAL: PROPER MODULE EXPORTS
+// ==============================
+module.exports = {
+    registerOfficer,
+    getDepartmentIssues,
+    updateIssueStatus
 };

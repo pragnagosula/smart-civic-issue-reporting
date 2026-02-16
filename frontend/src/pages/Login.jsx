@@ -1,17 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useTranslation } from 'react-i18next';
-import { useNavigate, Link } from 'react-router-dom';
+// import { useTranslation } from 'react-i18next'; // Comment out if not needed
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import '../styles/AuthStyles.css';
 
 const ADMIN_EMAIL = "sneha.amballa0804@gmail.com";
 
 const Login = () => {
-    const { t } = useTranslation();
+    // const { t } = useTranslation(); // Comment out if not used
     const navigate = useNavigate();
+    const location = useLocation();
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState(''); // New state for admin password
+    const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+
+    useEffect(() => {
+        if (location.state?.message) {
+            setSuccessMessage(location.state.message);
+            // Clear the message from location state
+            window.history.replaceState({}, document.title);
+        }
+    }, [location]);
 
     const isAdmin = email === ADMIN_EMAIL;
 
@@ -19,29 +30,25 @@ const Login = () => {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setSuccessMessage('');
 
         try {
             if (isAdmin) {
-                // Admin Login Flow (Password based)
                 const res = await axios.post('http://localhost:5000/api/auth/admin-login', {
                     email,
                     password
                 });
 
-                // Login Success -> Store Token -> Admin Dashboard
                 const { token, user } = res.data;
                 localStorage.setItem('token', token);
                 if (user.preferred_language) {
                     localStorage.setItem('language', user.preferred_language);
                 }
                 navigate('/admin/dashboard');
-
             } else {
-                // Normal User Flow (OTP based)
                 await axios.post('http://localhost:5000/api/auth/login', { email });
                 navigate('/verify-otp', { state: { email, isSignup: false } });
             }
-
         } catch (err) {
             setError(err.response?.data?.message || 'Login failed');
         } finally {
@@ -51,51 +58,106 @@ const Login = () => {
 
     return (
         <div className="auth-container">
-            <div className="card auth-card">
-                <h2 className="text-center mb-4">{isAdmin ? 'Admin Login' : t('login')}</h2>
-
-                {error && <div className="text-center" style={{ color: 'var(--error-color)', marginBottom: '1rem' }}>{error}</div>}
-
-                <form onSubmit={handleSubmit}>
-                    <div className="input-group">
-                        <label>{t('email')}</label>
-                        <input
-                            type="email"
-                            name="email"
-                            className="input-field"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            autoComplete="email"
-                        />
-                    </div>
-
-                    {isAdmin && (
-                        <div className="input-group">
-                            <label>Admin Secret Code</label>
-                            <input
-                                type="password"
-                                name="password"
-                                className="input-field"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                placeholder="Enter admin secret"
-                                autoComplete="current-password"
-                            />
+            <div className="card">
+                <div className="auth-header">
+                    <h2>{isAdmin ? 'Admin Access' : 'Welcome Back'}</h2>
+                    <p>{isAdmin ? 'Secure admin portal' : 'Sign in to your account'}</p>
+                </div>
+                
+                <div className="auth-body">
+                    {successMessage && (
+                        <div className="success-message">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                            {successMessage}
                         </div>
                     )}
 
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
-                        {loading ? 'Processing...' : (isAdmin ? 'Login as Admin' : t('send_otp'))}
-                    </button>
-                </form>
+                    {error && (
+                        <div className="error-message">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                            </svg>
+                            {error}
+                        </div>
+                    )}
 
-                {!isAdmin && (
-                    <p className="text-center mt-4">
-                        <Link to="/signup" className="link">{t('no_account')}</Link>
-                    </p>
-                )}
+                    <form onSubmit={handleSubmit}>
+                        <div className="input-group">
+                            <label>Email Address</label>
+                            <input
+                                type="email"
+                                className="input-field"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Enter your email"
+                                required
+                                autoComplete="email"
+                            />
+                            {isAdmin && (
+                                <span className="badge badge-primary" style={{ position: 'absolute', right: '1rem', top: '2.5rem' }}>
+                                    Admin
+                                </span>
+                            )}
+                        </div>
+
+                        {isAdmin && (
+                            <div className="input-group">
+                                <label>Admin Secret Code</label>
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Enter admin secret"
+                                    required
+                                    autoComplete="current-password"
+                                />
+                            </div>
+                        )}
+
+                        <button 
+                            type="submit" 
+                            className="btn btn-primary" 
+                            style={{ width: '100%' }} 
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <>
+                                    <span className="loader"></span>
+                                    Processing...
+                                </>
+                            ) : (
+                                isAdmin ? 'Access Admin Panel' : 'Continue with Email'
+                            )}
+                        </button>
+                    </form>
+
+                    {!isAdmin && (
+                        <>
+                            <div className="divider">New to our platform?</div>
+                            
+                            <div className="footer-links">
+                                <Link to="/signup" className="btn btn-outline" style={{ textDecoration: 'none' }}>
+                                    Create an Account
+                                </Link>
+                            </div>
+                        </>
+                    )}
+
+                    {isAdmin && (
+                        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                            <button
+                                onClick={() => setEmail('')}
+                                className="link"
+                                style={{ fontSize: '0.875rem' }}
+                            >
+                                ← Back to user login
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

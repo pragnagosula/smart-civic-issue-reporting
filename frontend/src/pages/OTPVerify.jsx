@@ -1,19 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
-import i18n from '../i18n'; // Import i18n instance
-import { useLocation, useNavigate } from 'react-router-dom';
+import i18n from '../i18n';
+import { useLocation, useNavigate, Link } from 'react-router-dom'; // Added Link import
+import '../styles/AuthStyles.css';
 
 const OTPVerify = () => {
     const { t } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
-    const { email, isSignup } = location.state || {}; // Expect email passed from previous page
-
-    const [otp, setOtp] = useState('');
+    const { email, isSignup } = location.state || {};
+    
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [timer, setTimer] = useState(300); // 5 minutes in seconds
+    const [timer, setTimer] = useState(300);
+    const inputRefs = useRef([]);
 
     useEffect(() => {
         let interval;
@@ -25,10 +27,37 @@ const OTPVerify = () => {
         return () => clearInterval(interval);
     }, [timer]);
 
+    useEffect(() => {
+        if (inputRefs.current[0]) {
+            inputRefs.current[0].focus();
+        }
+    }, []);
+
     const formatTime = (seconds) => {
         const minutes = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+    };
+
+    const handleChange = (index, value) => {
+        if (value.length > 1) {
+            value = value.charAt(0);
+        }
+        
+        const newOtp = [...otp];
+        newOtp[index] = value.replace(/[^0-9]/g, '');
+        setOtp(newOtp);
+
+        // Auto-focus next input
+        if (value && index < 5) {
+            inputRefs.current[index + 1].focus();
+        }
+    };
+
+    const handleKeyDown = (index, e) => {
+        if (e.key === 'Backspace' && !otp[index] && index > 0) {
+            inputRefs.current[index - 1].focus();
+        }
     };
 
     if (!email) {
@@ -41,36 +70,44 @@ const OTPVerify = () => {
         setLoading(true);
         setError('');
 
+        const otpString = otp.join('');
+        if (otpString.length !== 6) {
+            setError(t('otp_incomplete') || 'Please enter complete 6-digit OTP');
+            setLoading(false);
+            return;
+        }
+
         const endpoint = isSignup
             ? 'http://localhost:5000/api/auth/verify-otp'
             : 'http://localhost:5000/api/auth/login-verify';
 
         try {
-            const response = await axios.post(endpoint, { email, otp });
+            const response = await axios.post(endpoint, { email, otp: otpString });
 
             if (isSignup) {
-                // Just verification, now go to login
-                alert(t('signup_verified', { defaultValue: 'Account verified! Please login.' }));
-                navigate('/login');
+                navigate('/login', { 
+                    state: { 
+                        message: t('account_verified') || 'Account verified successfully! Please login with your email.' 
+                    } 
+                });
             } else {
-                // Login success, store token
                 const { token, user } = response.data;
                 localStorage.setItem('token', token);
                 if (user.preferred_language) {
                     localStorage.setItem('language', user.preferred_language);
                     i18n.changeLanguage(user.preferred_language);
                 }
+                
                 if (user.role === "admin") {
                     navigate("/admin/dashboard");
                 } else if (user.role === "officer") {
                     navigate("/officer/dashboard");
                 } else {
-                    navigate("/dashboard"); // Citizen dashboard
+                    navigate("/dashboard");
                 }
             }
-
         } catch (err) {
-            setError(err.response?.data?.message || 'Invalid OTP');
+            setError(err.response?.data?.message || t('invalid_otp') || 'Invalid OTP');
         } finally {
             setLoading(false);
         }
@@ -80,70 +117,130 @@ const OTPVerify = () => {
         try {
             setLoading(true);
             await axios.post('http://localhost:5000/api/auth/send-otp', { email });
-            setTimer(300); // Reset timer
-            alert(t('otp_sent'));
+            setTimer(300);
+            setOtp(['', '', '', '', '', '']);
+            setError('');
+            if (inputRefs.current[0]) {
+                inputRefs.current[0].focus();
+            }
         } catch (err) {
-            alert('Failed to send OTP');
+            setError(t('resend_failed') || 'Failed to send OTP');
         } finally {
             setLoading(false);
         }
     };
 
+    const handlePaste = (e) => {
+        e.preventDefault();
+        const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+        if (pastedData.length === 6) {
+            const newOtp = pastedData.split('');
+            setOtp(newOtp);
+            
+            // Focus last input after paste
+            if (inputRefs.current[5]) {
+                inputRefs.current[5].focus();
+            }
+        }
+    };
+
     return (
         <div className="auth-container">
-            <div className="card auth-card">
-                <h2 className="text-center mb-4">{isSignup ? t('verify_otp') : t('login')}</h2>
-                <p className="text-center" style={{ color: '#94a3b8' }}>
-                    {t('otp_sent')} <span style={{ color: 'white', fontWeight: 'bold' }}>{email}</span>
-                </p>
+            <div className="card">
+                <div className="auth-header">
+                    <h2>{isSignup ? t('verify_email') || 'Verify Email' : t('login')}</h2>
+                    <p>{t('enter_verification_code') || 'Enter the verification code'}</p>
+                </div>
+                
+                <div className="auth-body">
+                    <p style={{ 
+                        textAlign: 'center', 
+                        marginBottom: '2rem',
+                        color: 'var(--text-secondary)'
+                    }}>
+                        {t('otp_sent_message') || "We've sent a 6-digit code to"}<br />
+                        <strong style={{ color: 'var(--primary)' }}>{email}</strong>
+                    </p>
 
-                {error && <div className="text-center" style={{ color: 'var(--error-color)', marginBottom: '1rem' }}>{error}</div>}
+                    {error && (
+                        <div className="error-message">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                            </svg>
+                            {error}
+                        </div>
+                    )}
 
-                <form onSubmit={handleSubmit}>
-                    <div className="input-group">
-                        <input
-                            type="text"
-                            name="otp"
-                            className="input-field text-center"
-                            placeholder={t('otp_placeholder') || 'Enter 6-digit OTP'}
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                            maxLength="6"
-                            required
-                            style={{ letterSpacing: '0.5rem', fontSize: '1.5rem', marginTop: '1rem' }}
-                        />
+                    <form onSubmit={handleSubmit}>
+                        <div className="otp-inputs" onPaste={handlePaste}>
+                            {otp.map((digit, index) => (
+                                <input
+                                    key={index}
+                                    type="text"
+                                    className="otp-input"
+                                    maxLength="1"
+                                    value={digit}
+                                    onChange={(e) => handleChange(index, e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(index, e)}
+                                    ref={(el) => (inputRefs.current[index] = el)}
+                                    disabled={loading}
+                                    autoComplete="off"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                />
+                            ))}
+                        </div>
+
+                        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                            <span className={`timer ${timer === 0 ? 'expired' : ''}`}>
+                                {timer > 0 ? (
+                                    <>{t('time_remaining') || 'Time remaining'}: {formatTime(timer)}</>
+                                ) : (
+                                    t('code_expired') || 'Code expired'
+                                )}
+                            </span>
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            className="btn btn-primary" 
+                            style={{ width: '100%' }} 
+                            disabled={loading || timer === 0}
+                        >
+                            {loading ? (
+                                <>
+                                    <span className="loader"></span>
+                                    {t('verifying') || 'Verifying...'}
+                                </>
+                            ) : (
+                                isSignup ? (t('verify_continue') || 'Verify & Continue') : (t('login') || 'Login')
+                            )}
+                        </button>
+                    </form>
+
+                    <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+                        <button
+                            className="link"
+                            onClick={handleResend}
+                            disabled={timer > 0 || loading}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                fontSize: '0.875rem',
+                                opacity: (timer > 0 || loading) ? 0.5 : 1,
+                                cursor: (timer > 0 || loading) ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            {t('didnt_receive') || "Didn't receive code?"} <strong>{t('resend') || 'Resend'}</strong>
+                        </button>
                     </div>
 
-                    <div className="text-center mb-4" style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-                        {timer > 0 ? (
-                            <span>Time remaining: {formatTime(timer)}</span>
-                        ) : (
-                            <span style={{ color: 'var(--error-color)' }}>OTP Expired</span>
-                        )}
+                    <div className="footer-links">
+                        <Link to="/login" className="link">
+                            {t('back_to_login') || 'Back to Login'}
+                        </Link>
                     </div>
-
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
-                        {loading ? 'Verifying...' : t('verify_otp')}
-                    </button>
-                </form>
-
-                <p className="text-center mt-4">
-                    <button
-                        className="link"
-                        onClick={handleResend}
-                        disabled={timer > 0 || loading}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: 0,
-                            cursor: (timer > 0 || loading) ? 'not-allowed' : 'pointer',
-                            opacity: (timer > 0 || loading) ? 0.5 : 1,
-                            color: 'var(--primary-color)'
-                        }}
-                    >
-                        Resend OTP
-                    </button>
-                </p>
+                </div>
             </div>
         </div>
     );

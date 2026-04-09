@@ -145,8 +145,24 @@ const OTPVerify = () => {
     };
 
     return (
-        <div className="auth-container">
-            <div className="card">
+        <div className="auth-container" style={{
+            background: 'radial-gradient(circle at 50% 50%, #eff6ff 0%, #f3f4f6 100%)',
+            position: 'relative',
+            overflow: 'hidden'
+        }}>
+            {/* Background elements for aesthetic */}
+            <div style={{
+                position: 'absolute', top: '-10%', left: '-10%', width: '400px', height: '400px',
+                background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
+                filter: 'blur(40px)'
+            }} />
+            <div style={{
+                position: 'absolute', bottom: '-10%', right: '-5%', width: '300px', height: '300px',
+                background: 'radial-gradient(circle, rgba(30, 64, 175, 0.1) 0%, transparent 70%)',
+                filter: 'blur(30px)'
+            }} />
+            
+            <div className="card otp-wrapper-card">
                 <div className="auth-header">
                     <h2>{isSignup ? t('verify_email') || 'Verify Email' : t('login')}</h2>
                     <p>{t('enter_verification_code') || 'Enter the verification code'}</p>

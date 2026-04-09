@@ -58,11 +58,27 @@ const Login = () => {
 
     return (
         <div className="auth-container">
-            <div className="card">
-                <div className="auth-header">
-                    <h2>{isAdmin ? 'Admin Access' : 'Welcome Back'}</h2>
-                    <p>{isAdmin ? 'Secure admin portal' : 'Sign in to your account'}</p>
+            <div className="card split-card">
+                <div className="auth-branding">
+                    <div className="branding-content">
+                        <div className="branding-logo">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor" />
+                                <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" />
+                                <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" />
+                            </svg>
+                            <h2>CIVICFIX</h2>
+                        </div>
+                        <p>Streamlining urban governance with AI-powered reporting and transparent civic management.</p>
+                        <Link to="/" className="branding-btn">Back to Home</Link>
+                    </div>
                 </div>
+                
+                <div className="auth-form-wrapper">
+                    <div className="auth-header">
+                        <h2>{isAdmin ? 'Admin Access' : 'Log in'}</h2>
+                        <p>{isAdmin ? 'Secure admin portal' : 'Welcome back! Please enter your details.'}</p>
+                    </div>
                 
                 <div className="auth-body">
                     {successMessage && (
@@ -157,6 +173,7 @@ const Login = () => {
                             </button>
                         </div>
                     )}
+                </div>
                 </div>
             </div>
         </div>

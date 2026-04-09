@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import '../styles/OfficerRegister.css';
 
 const OfficerRegister = () => {
@@ -122,16 +122,32 @@ const OfficerRegister = () => {
 
     return (
         <div className="auth-container">
-            <div className="card officer-card">
-                <div className="auth-header">
-                    <div className="header-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                        </svg>
+            <div className="card split-card officer-card">
+                <div className="auth-branding">
+                    <div className="branding-content">
+                        <div className="branding-logo">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor" />
+                                <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" />
+                                <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" />
+                            </svg>
+                            <h2>CIVICFIX</h2>
+                        </div>
+                        <p>Streamlining urban governance with AI-powered reporting and transparent civic management.</p>
+                        <Link to="/" className="branding-btn">Back to Home</Link>
                     </div>
-                    <h2>Officer Registration</h2>
-                    <p>Join the CivicFix team to manage and resolve civic issues</p>
                 </div>
+                
+                <div className="auth-form-wrapper">
+                    <div className="auth-header">
+                        <div className="header-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            </svg>
+                        </div>
+                        <h2>Officer Registration</h2>
+                        <p>Join the CivicFix team to manage and resolve civic issues</p>
+                    </div>
 
                 <div className="auth-body">
                     {error && (
@@ -346,6 +362,7 @@ const OfficerRegister = () => {
                             Already registered? <a href="/login" className="link">Login here</a>
                         </p>
                     </form>
+                </div>
                 </div>
             </div>
         </div>

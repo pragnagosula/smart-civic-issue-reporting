@@ -109,6 +109,28 @@ const initDb = async () => {
                 await sql`ALTER TABLE issue_citizens ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating >= 1 AND rating <= 5)`;
                 console.log("Feedback columns added to 'issue_citizens'.");
 
+                // Create Comments and Likes Tables
+                await sql`
+                    CREATE TABLE IF NOT EXISTS issue_comments (
+                        id SERIAL PRIMARY KEY,
+                        issue_id INTEGER REFERENCES issues(id) ON DELETE CASCADE,
+                        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                        comment TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                `;
+
+                await sql`
+                    CREATE TABLE IF NOT EXISTS issue_likes (
+                        id SERIAL PRIMARY KEY,
+                        issue_id INTEGER REFERENCES issues(id) ON DELETE CASCADE,
+                        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(issue_id, user_id)
+                    )
+                `;
+                console.log("Tables 'issue_comments' and 'issue_likes' created.");
+
                 // Add Issue Tracking Columns
                 await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP`;
                 await sql`ALTER TABLE issues ADD COLUMN IF NOT EXISTS reopen_count INTEGER DEFAULT 0`;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import jwtDecode from 'jwt-decode';
 import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar'; // optional, if you want top navbar
 import '../styles/IssueDetails.css'; // new dedicated styles
@@ -13,6 +14,112 @@ const IssueDetails = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [commentText, setCommentText] = useState('');
+    const [comments, setComments] = useState([]);
+    const [likes, setLikes] = useState(0);
+    const [userLiked, setUserLiked] = useState(false);
+    const [currentUser, setCurrentUser] = useState({ role: '', id: '' });
+    const [actionLoading, setActionLoading] = useState(false);
+    const [likeLoading, setLikeLoading] = useState(false);
+
+    const canComment = ['citizen', 'officer'].includes(currentUser.role);
+    const canDeleteComments = currentUser.role === 'admin';
+
+    const decodeToken = () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                const decoded = jwtDecode(token);
+                setCurrentUser(decoded);
+            } catch (err) {
+                console.error('Token decode failed', err);
+            }
+        }
+    };
+
+    const fetchIssueDetails = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`http://localhost:5000/api/issues/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const issueData = response.data;
+            setIssue(issueData);
+            setComments(issueData.comments || []);
+            setLikes(issueData.likes || 0);
+            setUserLiked(issueData.user_liked || false);
+        } catch (err) {
+            console.error('Error fetching issue details:', err);
+            setError('Failed to load issue details.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        decodeToken();
+        if (id) fetchIssueDetails();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
+
+    const handleCommentSubmit = async () => {
+        if (!commentText.trim()) return;
+        setActionLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`http://localhost:5000/api/issues/${id}/comment`,
+                { comment: commentText.trim() },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setCommentText('');
+            await fetchIssueDetails();
+        } catch (err) {
+            console.error('Failed to submit comment:', err);
+            alert('Unable to post comment.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleToggleLike = async () => {
+        setLikeLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.post(`http://localhost:5000/api/issues/${id}/like`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.data.liked) {
+                setLikes(prev => prev + 1);
+                setUserLiked(true);
+            } else {
+                setLikes(prev => Math.max(0, prev - 1));
+                setUserLiked(false);
+            }
+        } catch (err) {
+            console.error('Unable to toggle like:', err);
+            alert('Could not update like.');
+        } finally {
+            setLikeLoading(false);
+        }
+    };
+
+    const handleDeleteComment = async (commentId) => {
+        if (!window.confirm('Remove this comment?')) return;
+        setActionLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`http://localhost:5000/api/issues/${id}/comment/${commentId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            await fetchIssueDetails();
+        } catch (err) {
+            console.error('Error deleting comment:', err);
+            alert('Could not remove comment.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
     const getLocalizedDescription = (issue) => {
         if (!issue.description) return issue.voice_text || t('no_description');
@@ -118,6 +225,73 @@ const IssueDetails = () => {
                             >
                                 {Number(issue.latitude).toFixed(6)}, {Number(issue.longitude).toFixed(6)} ↗
                             </a>
+                        </div>
+                    </div>
+
+                    <div className="issue-activity-card">
+                        <div className="activity-header">
+                            <div>
+                                <span className="activity-title">Likes & Comments</span>
+                                <span className="activity-subtitle">Track community responses for this issue</span>
+                            </div>
+                            <button
+                                type="button"
+                                className={`like-button ${userLiked ? 'liked' : ''}`}
+                                onClick={handleToggleLike}
+                                disabled={likeLoading || !canComment}
+                            >
+                                {userLiked ? '💚 Liked' : '🤍 Like'} ({likes})
+                            </button>
+                        </div>
+
+                        {canComment && (
+                            <div className="comment-action-panel">
+                                <textarea
+                                    className="comment-input"
+                                    rows="4"
+                                    value={commentText}
+                                    onChange={(e) => setCommentText(e.target.value)}
+                                    placeholder="Share your thoughts or update about this issue..."
+                                />
+                                <button
+                                    type="button"
+                                    className="btn btn-primary submit-comment-btn"
+                                    onClick={handleCommentSubmit}
+                                    disabled={actionLoading || !commentText.trim()}
+                                >
+                                    {actionLoading ? 'Posting...' : 'Post Comment'}
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="comments-section">
+                            <h3 className="comments-heading">Comments</h3>
+                            {comments.length === 0 ? (
+                                <p className="empty-comments">No comments yet. Be the first to respond.</p>
+                            ) : (
+                                comments.map(comment => (
+                                    <div key={comment.id} className="comment-card">
+                                        <div className="comment-top-row">
+                                            <div>
+                                                <span className="comment-author">{comment.name || 'User'}</span>
+                                                <span className="comment-role">{comment.role}</span>
+                                            </div>
+                                            <span className="comment-date">{formatDate(comment.created_at)}</span>
+                                        </div>
+                                        <p className="comment-text">{comment.comment}</p>
+                                        {canDeleteComments && (
+                                            <button
+                                                type="button"
+                                                className="btn btn-danger delete-comment-btn"
+                                                onClick={() => handleDeleteComment(comment.id)}
+                                                disabled={actionLoading}
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
 

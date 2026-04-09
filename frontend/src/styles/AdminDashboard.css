@@ -1036,9 +1036,6 @@ select.input-field {
 }
 
 /* ===== UTILITY CLASSES ===== */
-.no-print {
-    /* Hidden in print */
-}
 
 .sr-only {
     position: absolute;
@@ -1050,4 +1047,64 @@ select.input-field {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border-width: 0;
+}
+
+/* ===== ADMIN TABS ===== */
+.admin-tabs {
+    background: var(--surface);
+    border-bottom: 1px solid var(--divider);
+    box-shadow: var(--shadow-1);
+    position: sticky;
+    top: 0;
+    z-index: 999;
+}
+
+.tabs-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 var(--space-7);
+    display: flex;
+    gap: var(--space-6);
+    overflow-x: auto;
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    padding: var(--space-5) 0;
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.tab-btn:hover {
+    color: var(--primary);
+}
+
+.tab-btn.active {
+    color: var(--gov-navy);
+}
+
+.tab-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gov-saffron);
+    border-radius: 3px 3px 0 0;
+    opacity: 0;
+    transform: scaleX(0.8);
+    transition: all 0.2s ease;
+}
+
+.tab-btn.active::after {
+    opacity: 1;
+    transform: scaleX(1);
 }

@@ -304,6 +304,107 @@ const getLocalizedText = (obj, lang) => {
     return obj[lang] || obj['en'] || Object.values(obj)[0] || '';
 };
 
+const isCitizenOrOfficer = (role) => ['citizen', 'officer'].includes(role);
+
+exports.addComment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { comment } = req.body;
+        const userId = req.user.id;
+
+        if (!isCitizenOrOfficer(req.user.role)) {
+            return res.status(403).json({ message: 'Only citizens and officers can comment on issues' });
+        }
+
+        if (!comment || !comment.trim()) {
+            return res.status(400).json({ message: 'Comment cannot be empty' });
+        }
+
+        const issue = await sql`SELECT id FROM issues WHERE id = ${id}`;
+        if (issue.length === 0) {
+            return res.status(404).json({ message: 'Issue not found' });
+        }
+
+        const insertedComment = await sql`
+            INSERT INTO issue_comments (issue_id, user_id, comment)
+            VALUES (${id}, ${userId}, ${comment.trim()})
+            RETURNING id, issue_id, user_id, comment, created_at
+        `;
+
+        res.status(201).json({ comment: insertedComment[0] });
+    } catch (err) {
+        console.error('Error adding comment:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.toggleLike = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        if (!isCitizenOrOfficer(req.user.role)) {
+            return res.status(403).json({ message: 'Only citizens and officers can like issues' });
+        }
+
+        const issue = await sql`SELECT id FROM issues WHERE id = ${id}`;
+        if (issue.length === 0) {
+            return res.status(404).json({ message: 'Issue not found' });
+        }
+
+        const existingLike = await sql`
+            SELECT id FROM issue_likes
+            WHERE issue_id = ${id} AND user_id = ${userId}
+        `;
+
+        if (existingLike.length > 0) {
+            await sql`
+                DELETE FROM issue_likes WHERE id = ${existingLike[0].id}
+            `;
+            return res.json({ liked: false });
+        }
+
+        await sql`
+            INSERT INTO issue_likes (issue_id, user_id)
+            VALUES (${id}, ${userId})
+        `;
+
+        res.json({ liked: true });
+    } catch (err) {
+        console.error('Error toggling like:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.deleteComment = async (req, res) => {
+    try {
+        const { issueId, commentId } = req.params;
+
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Only admin can remove comments' });
+        }
+
+        const comment = await sql`
+            SELECT id FROM issue_comments
+            WHERE id = ${commentId} AND issue_id = ${issueId}
+        `;
+
+        if (comment.length === 0) {
+            return res.status(404).json({ message: 'Comment not found' });
+        }
+
+        await sql`
+            DELETE FROM issue_comments
+            WHERE id = ${commentId}
+        `;
+
+        res.json({ message: 'Comment removed successfully' });
+    } catch (err) {
+        console.error('Error deleting comment:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 exports.getMyIssues = async (req, res) => {
     try {
         const citizen_id = req.user.id;
@@ -336,14 +437,58 @@ exports.getMyIssues = async (req, res) => {
     }
 };
 
+exports.getAllIssues = async (req, res) => {
+    try {
+        const { search, status, category } = req.query;
+        const userLang = req.user.language || req.user.preferred_language || 'en';
+
+        const whereClauses = [sql`status != 'Flagged'`];
+        const bindings = [];
+
+        if (status) {
+            whereClauses.push(sql`LOWER(status) = LOWER(${status})`);
+        }
+
+        if (category) {
+            whereClauses.push(sql`LOWER(category) = LOWER(${category})`);
+        }
+
+        if (search) {
+            const searchTerm = `%${search}%`;
+            whereClauses.push(sql`(
+                LOWER(COALESCE(voice_text, '')) LIKE LOWER(${searchTerm})
+                OR LOWER(COALESCE(CASE WHEN json_typeof(description) = 'object' THEN description->>'en' ELSE description END, '')) LIKE LOWER(${searchTerm})
+            )`);
+        }
+
+        const issues = await sql`
+            SELECT id, category, status, timestamp, voice_text, description, latitude, longitude, language, created_at, ai_status
+            FROM issues
+            WHERE ${sql.join(whereClauses, sql` AND `)}
+            ORDER BY created_at DESC
+        `;
+
+        const localizedIssues = issues.map(issue => {
+            const desc = getLocalizedText(issue.description, userLang);
+            return {
+                ...issue,
+                description: desc || issue.voice_text,
+                voice_text: desc || issue.voice_text
+            };
+        });
+
+        res.json(localizedIssues);
+    } catch (err) {
+        console.error('Error fetching all issues:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 exports.getIssueDetails = async (req, res) => {
     try {
         const { id } = req.params;
-        const citizen_id = req.user.id;
+        const userId = req.user.id;
 
-        // Check if user is authorized (Reporter OR Crowdsourced)
-        // We use a LEFT JOIN on issue_citizens to check linkage
-        // Also LEFT JOIN users to get Officer Name
         const issues = await sql`
             SELECT i.*, 
                    u.name as officer_name,
@@ -351,7 +496,7 @@ exports.getIssueDetails = async (req, res) => {
                    CASE WHEN ic.citizen_id IS NOT NULL THEN true ELSE false END as is_linked
             FROM issues i
             LEFT JOIN users u ON i.assigned_officer_id = u.id
-            LEFT JOIN issue_citizens ic ON i.id = ic.issue_id AND ic.citizen_id = ${citizen_id}
+            LEFT JOIN issue_citizens ic ON i.id = ic.issue_id AND ic.citizen_id = ${userId}
             WHERE i.id = ${id}
         `;
 
@@ -360,15 +505,17 @@ exports.getIssueDetails = async (req, res) => {
         }
 
         const issue = issues[0];
+        const allowedToView = issue.citizen_id === userId
+            || issue.assigned_officer_id === userId
+            || issue.is_linked
+            || req.user.role === 'admin';
 
-        // Authorization Check
-        if (issue.citizen_id !== citizen_id && !issue.is_linked) {
+        if (!allowedToView) {
             return res.status(403).json({ message: 'Unauthorized access to this issue' });
         }
 
         const userLang = req.user.language || req.user.preferred_language || 'en';
 
-        // Localize Fields
         const desc = getLocalizedText(issue.description, userLang);
         issue.description = desc || issue.voice_text;
         issue.voice_text = desc || issue.voice_text;
@@ -377,8 +524,30 @@ exports.getIssueDetails = async (req, res) => {
             issue.resolution_note = getLocalizedText(issue.resolution_note, userLang);
         }
 
-        // Clean up
-        // delete issue.description; // We keep it as string now, overwriting object
+        const comments = await sql`
+            SELECT c.id, c.comment, c.created_at, u.id as user_id, u.name, u.role
+            FROM issue_comments c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.issue_id = ${id}
+            ORDER BY c.created_at ASC
+        `;
+
+        const likesCount = await sql`
+            SELECT COUNT(*)::INT AS total_likes
+            FROM issue_likes
+            WHERE issue_id = ${id}
+        `;
+
+        const userLike = await sql`
+            SELECT 1
+            FROM issue_likes
+            WHERE issue_id = ${id} AND user_id = ${userId}
+            LIMIT 1
+        `;
+
+        issue.comments = comments;
+        issue.likes = likesCount[0]?.total_likes || 0;
+        issue.user_liked = userLike.length > 0;
 
         res.json(issue);
     } catch (err) {
@@ -394,6 +563,10 @@ exports.getAllIssues = async (req, res) => {
 
 exports.assignIssue = async (req, res) => {
     try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Only admin can assign officers to issues' });
+        }
+
         const { id } = req.params;
         const { officerId } = req.body;
 

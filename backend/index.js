@@ -7,6 +7,9 @@ const adminRoutes = require('./routes/adminRoutes');
 const issueRoutes = require('./routes/issueRoutes');
 const officerRoutes = require('./routes/officerRoutes');
 
+// Ensure DB schema is initialized before handling requests
+require('./initDb');
+
 const app = express();
 
 app.use(cors());

@@ -9,14 +9,26 @@ const transporter = nodemailer.createTransport({
     },
 });
 
+let emailLimitExceeded = false;
+
 // Debug: Check if credentials are loaded
 if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
-    console.warn("WARNING: Email credentials are MISING in .env file!");
+    console.warn("WARNING: Email credentials are MISSING in .env file!");
     console.warn("EMAIL_USER present:", !!process.env.EMAIL_USER);
     console.warn("EMAIL_APP_PASSWORD present:", !!process.env.EMAIL_APP_PASSWORD);
 }
 
 const sendEmail = async (to, subject, text) => {
+    if (emailLimitExceeded) {
+        console.warn('Skipping email send because Gmail daily sending limit was previously reached.');
+        return false;
+    }
+
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+        console.warn('Email send aborted because credentials are missing.');
+        return false;
+    }
+
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to,
@@ -30,6 +42,11 @@ const sendEmail = async (to, subject, text) => {
         return true;
     } catch (error) {
         console.error('Error sending generic email:', error.message);
+        const message = error.response?.data?.error?.message || error.message || '';
+        if (message.includes('Daily user sending limit exceeded')) {
+            emailLimitExceeded = true;
+            console.warn('Gmail daily sending limit exceeded; further email sends will be suppressed until process restart.');
+        }
         return false;
     }
 };

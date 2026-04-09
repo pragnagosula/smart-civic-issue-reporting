@@ -1,7 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+} from 'chart.js';
+import { Bar, Pie } from 'react-chartjs-2';
 import '../styles/AdminDashboard.css';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
 
 const AdminDashboard = () => {
     const [officers, setOfficers] = useState([]);
@@ -15,6 +36,7 @@ const AdminDashboard = () => {
         resolvedToday: 0
     });
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState('overview');
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -90,6 +112,54 @@ const AdminDashboard = () => {
 
     const escalatedIssues = issues.filter(i => i.status === 'Escalated');
 
+    // Helper to generate a fake locality based on coordinates or simply pick random based on issue ID
+    const getLocality = (issue) => {
+        if (!issue.latitude || !issue.longitude) return 'Unknown';
+        const lat = parseFloat(issue.latitude);
+        if (lat > 28.6) return 'North Zone';
+        if (lat < 28.5) return 'South Zone';
+        if (parseFloat(issue.longitude) > 77.2) return 'East Zone';
+        return 'West Zone';
+    };
+
+    // Analytics Data Preparation
+    const localityCounts = issues.reduce((acc, issue) => {
+        const loc = issue.address ? issue.address.split(',')[0] : getLocality(issue);
+        acc[loc] = (acc[loc] || 0) + 1;
+        return acc;
+    }, {});
+
+    const localityChartData = {
+        labels: Object.keys(localityCounts),
+        datasets: [
+            {
+                label: 'Issues by Locality',
+                data: Object.values(localityCounts),
+                backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                borderColor: 'rgba(59, 130, 246, 1)',
+                borderWidth: 1,
+            },
+        ],
+    };
+
+    const categoryCounts = issues.reduce((acc, issue) => {
+        acc[issue.category] = (acc[issue.category] || 0) + 1;
+        return acc;
+    }, {});
+
+    const categoryPieData = {
+        labels: Object.keys(categoryCounts),
+        datasets: [
+            {
+                label: 'Issues by Category',
+                data: Object.values(categoryCounts),
+                backgroundColor: [
+                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
+                ],
+            },
+        ],
+    };
+
     if (loading) {
         return (
             <div className="loading-overlay">
@@ -130,8 +200,17 @@ const AdminDashboard = () => {
                 </div>
             </header>
 
+            <div className="admin-tabs">
+                <div className="tabs-container">
+                    <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>Overview</button>
+                    <button className={`tab-btn ${activeTab === 'issues' ? 'active' : ''}`} onClick={() => setActiveTab('issues')}>Issues Management</button>
+                    <button className={`tab-btn ${activeTab === 'officers' ? 'active' : ''}`} onClick={() => setActiveTab('officers')}>Officers List</button>
+                    <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>Analytics</button>
+                </div>
+            </div>
+
             <main className="dashboard-container">
-                {/* System Overview Statistics */}
+                {activeTab === 'overview' && (
                 <section className="dashboard-section">
                     <div className="section-header">
                         <h2 className="section-title">System Overview</h2>
@@ -215,6 +294,10 @@ const AdminDashboard = () => {
                         </article>
                     </div>
                 </section>
+                )}
+
+                {activeTab === 'issues' && (
+                    <>
 
                 {/* Critical Escalated Issues Alert */}
                 {escalatedIssues.length > 0 && (
@@ -234,7 +317,19 @@ const AdminDashboard = () => {
                     </section>
                 )}
 
-                {/* Officer Management Section */}
+                {/* All Reported Issues */}
+                <section className="dashboard-section">
+                    <div className="section-header">
+                        <h2 className="section-title">All Reported Issues</h2>
+                        <p className="section-subtitle">Complete system-wide issue tracking and management</p>
+                    </div>
+
+                    <IssuesTable issues={issues} officers={officers} />
+                </section>
+                </>
+                )}
+
+                {activeTab === 'officers' && (
                 <section className="dashboard-section">
                     <div className="section-header">
                         <h2 className="section-title">Officer Management</h2>
@@ -343,16 +438,31 @@ const AdminDashboard = () => {
                         </table>
                     </div>
                 </section>
+                )}
 
-                {/* All Reported Issues */}
-                <section className="dashboard-section">
-                    <div className="section-header">
-                        <h2 className="section-title">All Reported Issues</h2>
-                        <p className="section-subtitle">Complete system-wide issue tracking and management</p>
-                    </div>
-
-                    <IssuesTable issues={issues} officers={officers} />
-                </section>
+                {activeTab === 'analytics' && (
+                    <section className="dashboard-section">
+                        <div className="section-header">
+                            <h2 className="section-title">Platform Analytics</h2>
+                            <p className="section-subtitle">Visual insights into reported issues and system performance</p>
+                        </div>
+                        
+                        <div className="charts-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2rem' }}>
+                            <div className="chart-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+                                <h3 style={{ marginBottom: '1rem', color: '#111827', fontSize: '1.2rem', fontWeight: 'bold' }}>Issues by Locality</h3>
+                                <div style={{ height: '300px' }}>
+                                    <Bar data={localityChartData} options={{ maintainAspectRatio: false, responsive: true }} />
+                                </div>
+                            </div>
+                            <div className="chart-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+                                <h3 style={{ marginBottom: '1rem', color: '#111827', fontSize: '1.2rem', fontWeight: 'bold' }}>Issues by Category</h3>
+                                <div style={{ height: '300px', display: 'flex', justifyContent: 'center' }}>
+                                    <Pie data={categoryPieData} options={{ maintainAspectRatio: false, responsive: true }} />
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                )}
             </main>
         </div>
     );
@@ -477,6 +587,34 @@ const IssuesTable = ({ issues, officers }) => {
 
 // Issue Details Modal Component
 const IssueModal = ({ issue, officers, onClose }) => {
+    const [fullIssue, setFullIssue] = useState(null);
+    const [loadingIssue, setLoadingIssue] = useState(true);
+    const [issueError, setIssueError] = useState(null);
+
+    const issueToShow = fullIssue || issue;
+
+    const fetchIssueDetails = async () => {
+        try {
+            setLoadingIssue(true);
+            setIssueError(null);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`http://localhost:5000/api/issues/${issue.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setFullIssue(res.data);
+        } catch (err) {
+            console.error('Admin issue detail fetch failed:', err);
+            setIssueError('Unable to load full issue details.');
+        } finally {
+            setLoadingIssue(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchIssueDetails();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [issue.id]);
+
     const handleAssignOfficer = async (officerId) => {
         try {
             const token = localStorage.getItem('token');
@@ -562,7 +700,7 @@ const IssueModal = ({ issue, officers, onClose }) => {
                         <h4>Assign Officer</h4>
                         <select 
                             className="input-field"
-                            onChange={(e) => e.target.value && handleAssignOfficer(parseInt(e.target.value))}
+                            onChange={(e) => e.target.value && handleAssignOfficer(e.target.value)}
                             defaultValue=""
                             aria-label="Select officer to assign"
                         >
@@ -576,6 +714,32 @@ const IssueModal = ({ issue, officers, onClose }) => {
                                 ))
                             }
                         </select>
+                    </div>
+
+                    <div className="detail-section comments-preview-section">
+                        <h4>Likes</h4>
+                        <p className="likes-summary">{issueToShow.likes ?? 0} total like{issueToShow.likes === 1 ? '' : 's'}</p>
+                    </div>
+
+                    <div className="detail-section comments-preview-section">
+                        <h4>Recent Comments</h4>
+                        {loadingIssue ? (
+                            <p>Loading comments...</p>
+                        ) : issueError ? (
+                            <p className="error-text">{issueError}</p>
+                        ) : issueToShow.comments?.length ? (
+                            issueToShow.comments.map(c => (
+                                <div key={c.id} className="comment-preview-card">
+                                    <div className="comment-preview-header">
+                                        <strong>{c.name || 'User'}</strong>
+                                        <span className="comment-role">{c.role}</span>
+                                    </div>
+                                    <p>{c.comment}</p>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="empty-comments">No comments yet.</p>
+                        )}
                     </div>
                 </div>
             </div>

@@ -24,9 +24,29 @@ const Dashboard = () => {
     });
     const [categoryStats, setCategoryStats] = useState({});
 
+    const [tab, setTab] = useState('my');
+    const [allIssues, setAllIssues] = useState([]);
+    const [allLoading, setAllLoading] = useState(true);
+    const [searchText, setSearchText] = useState('');
+    const [selectedStatus, setSelectedStatus] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [filters, setFilters] = useState({ search: '', status: '', category: '' });
+
+    const statusOptions = ['', 'Reported', 'Assigned', 'In Progress', 'Resolved', 'Closed'];
+    const categoryOptions = ['','Street Lighting', 'Water Supply', 'Road Damage', 'Garbage', 'Sanitation', 'Drainage', 'Parks', 'Solid Waste Management', 'Other'];
+
     useEffect(() => {
         fetchIssues();
+        fetchAllIssues();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (tab === 'all') {
+            fetchAllIssues();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters, tab]);
 
     const fetchIssues = async () => {
         try {
@@ -57,6 +77,51 @@ const Dashboard = () => {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchAllIssues = async (activeFilters = filters) => {
+        try {
+            setAllLoading(true);
+            const token = localStorage.getItem('token');
+            const params = new URLSearchParams();
+            if (activeFilters.search) params.append('search', activeFilters.search);
+            if (activeFilters.status) params.append('status', activeFilters.status);
+            if (activeFilters.category) params.append('category', activeFilters.category);
+            const response = await axios.get(`http://localhost:5000/api/issues/all?${params.toString()}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAllIssues(response.data);
+        } catch (err) {
+            console.error('Error fetching all issues:', err);
+            if (err.response?.status === 401) {
+                navigate('/login');
+            }
+        } finally {
+            setAllLoading(false);
+        }
+    };
+
+    const handleApplyFilters = () => {
+        const nextFilters = {
+            search: searchText.trim(),
+            status: selectedStatus,
+            category: selectedCategory
+        };
+        setFilters(nextFilters);
+        if (tab === 'all') {
+            fetchAllIssues(nextFilters);
+        }
+    };
+
+    const handleResetFilters = () => {
+        setSearchText('');
+        setSelectedStatus('');
+        setSelectedCategory('');
+        const resetFilters = { search: '', status: '', category: '' };
+        setFilters(resetFilters);
+        if (tab === 'all') {
+            fetchAllIssues(resetFilters);
         }
     };
 
@@ -245,14 +310,63 @@ const Dashboard = () => {
                     </div>
                 </section>
 
-                {/* My Reported Issues */}
+                {/* Issue Lists */}
                 <section className="dashboard-section">
-                    <div className="section-header">
-                        <h2 className="section-title">My Reported Issues</h2>
-                        <p className="section-subtitle">Track and manage all your submitted civic issue reports</p>
+                    <div className="section-header dashboard-tabs-header">
+                        <div>
+                            <h2 className="section-title">Citizen Issue Tracker</h2>
+                            <p className="section-subtitle">Browse your reports or explore all civic issues in the area</p>
+                        </div>
+                        <div className="dashboard-tabs">
+                            <button
+                                className={`tab-button ${tab === 'my' ? 'tab-button-active' : ''}`}
+                                onClick={() => setTab('my')}
+                            >
+                                My Issues
+                            </button>
+                            <button
+                                className={`tab-button ${tab === 'all' ? 'tab-button-active' : ''}`}
+                                onClick={() => setTab('all')}
+                            >
+                                All Issues
+                            </button>
+                        </div>
                     </div>
 
-                    {issues.length === 0 ? (
+                    {tab === 'all' && (
+                        <div className="filter-toolbar">
+                            <input
+                                type="text"
+                                className="search-input"
+                                placeholder="Search by description, location, or reporter"
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                            />
+                            <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+                                {statusOptions.map((status) => (
+                                    <option key={status} value={status}>{status || 'All Statuses'}</option>
+                                ))}
+                            </select>
+                            <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                                {categoryOptions.map((category) => (
+                                    <option key={category} value={category}>{category || 'All Categories'}</option>
+                                ))}
+                            </select>
+                            <div className="filter-buttons">
+                                <button className="btn btn-secondary" onClick={handleApplyFilters}>Apply</button>
+                                <button className="btn btn-tertiary" onClick={handleResetFilters}>Reset</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {(tab === 'my' ? loading : allLoading) ? (
+                        <div className="loading-overlay small">
+                            <div className="spinner"></div>
+                            <p style={{ marginTop: '1rem', color: '#616161', fontSize: '0.95rem' }}>
+                                {tab === 'my' ? 'Loading your issues...' : 'Loading all issues...'}
+                            </p>
+                        </div>
+                    ) : (tab === 'my' ? issues : allIssues).length === 0 ? (
                         <div className="empty-state-card">
                             <div className="empty-state-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -260,19 +374,27 @@ const Dashboard = () => {
                                     <polyline points="14 2 14 8 20 8" />
                                 </svg>
                             </div>
-                            <h3 className="empty-state-title">No Issues Reported Yet</h3>
-                            <p className="empty-state-text">Start by reporting your first civic issue to help improve your community</p>
-                            <button className="btn btn-primary" onClick={handleReportIssue}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <line x1="12" y1="5" x2="12" y2="19" />
-                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                </svg>
-                                Report Your First Issue
-                            </button>
+                            <h3 className="empty-state-title">
+                                {tab === 'my' ? 'No Issues Reported Yet' : 'No Issues Found'}
+                            </h3>
+                            <p className="empty-state-text">
+                                {tab === 'my'
+                                    ? 'Start by reporting your first civic issue to help improve your community.'
+                                    : 'Try adjusting the filters or search terms to find what you need.'}
+                            </p>
+                            {tab === 'my' && (
+                                <button className="btn btn-primary" onClick={handleReportIssue}>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="12" y1="5" x2="12" y2="19" />
+                                        <line x1="5" y1="12" x2="19" y2="12" />
+                                    </svg>
+                                    Report Your First Issue
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="issues-grid">
-                            {issues.map((issue) => (
+                            {(tab === 'my' ? issues : allIssues).map((issue) => (
                                 <article
                                     key={issue.id}
                                     className="issue-card"
@@ -299,12 +421,11 @@ const Dashboard = () => {
                                             <span>{new Date(issue.timestamp?.endsWith('Z') ? issue.timestamp : issue.timestamp + 'Z').toLocaleDateString('en-IN')}</span>
                                         </div>
                                         <div className="issue-status-container">
-                                            <span className={`status-badge 
-                                                ${issue.status === 'Reported' && isOverdue(issue.created_at || issue.timestamp) 
-                                                    ? 'status-overdue' 
+                                            <span className={`status-badge ${issue.status === 'Reported' && isOverdue(issue.created_at || issue.timestamp)
+                                                    ? 'status-overdue'
                                                     : `status-${(issue.status || 'Reported').toLowerCase().replace(' ', '-')}`}`}>
-                                                {issue.status === 'Reported' && isOverdue(issue.created_at || issue.timestamp) 
-                                                    ? 'OVERDUE' 
+                                                {issue.status === 'Reported' && isOverdue(issue.created_at || issue.timestamp)
+                                                    ? 'OVERDUE'
                                                     : (issue.status || 'Reported').toUpperCase()}
                                             </span>
                                             {issue.ai_status && (

@@ -2,7 +2,14 @@ const axios = require('axios');
 require('dotenv').config();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5';
+const GEMINI_API_VERSION = process.env.GEMINI_API_VERSION || 'v1beta';
+const GEMINI_API_METHOD = process.env.GEMINI_API_METHOD || 'generateContent';
+const API_URL = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models/${GEMINI_MODEL}:${GEMINI_API_METHOD}?key=${GEMINI_API_KEY}`;
+
+if (!GEMINI_API_KEY) {
+    console.warn('WARNING: GEMINI_API_KEY is not set. Translation API calls will fail.');
+}
 
 /**
  * Translates text into English, Hindi, and Telugu using Gemini API.

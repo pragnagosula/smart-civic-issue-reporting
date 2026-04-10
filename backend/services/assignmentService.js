@@ -32,7 +32,7 @@ const findBestOfficer = async (category, lat, lon, excludeOfficerIds = []) => {
         // Ensure excludeOfficerIds is an array
         const exclusions = Array.isArray(excludeOfficerIds) ? excludeOfficerIds : (excludeOfficerIds ? [excludeOfficerIds] : []);
 
-        const officers = await sql`
+        const strictMatch = await sql`
             WITH officer_workload AS (
                 SELECT assigned_officer_id, COUNT(*) as active_issues
                 FROM issues
@@ -53,12 +53,72 @@ const findBestOfficer = async (category, lat, lon, excludeOfficerIds = []) => {
             WHERE u.role = 'officer'
             AND u.account_status = 'ACTIVE'
             AND LOWER(u.department) = LOWER(${category})
+            AND COALESCE(u.current_load, 0) < COALESCE(u.max_load, 999999)
             ${exclusions.length > 0 ? sql`AND NOT (u.id = ANY(${exclusions}))` : sql``}
             ORDER BY distance ASC, workload ASC
             LIMIT 1
         `;
 
-        return officers.length > 0 ? officers[0] : null;
+        if (strictMatch.length > 0) {
+            return strictMatch[0];
+        }
+
+        const anyWithCapacity = await sql`
+            WITH officer_workload AS (
+                SELECT assigned_officer_id, COUNT(*) as active_issues
+                FROM issues
+                WHERE status IN ('Assigned', 'In Progress')
+                GROUP BY assigned_officer_id
+            )
+            SELECT u.id, u.email, u.name,
+            COALESCE(ow.active_issues, 0) as workload,
+            (
+                6371 * acos(
+                    cos(radians(${lat})) * cos(radians(u.latitude)) *
+                    cos(radians(u.longitude) - radians(${lon})) +
+                    sin(radians(${lat})) * sin(radians(u.latitude))
+                )
+            ) AS distance
+            FROM users u
+            LEFT JOIN officer_workload ow ON u.id = ow.assigned_officer_id
+            WHERE u.role = 'officer'
+            AND u.account_status = 'ACTIVE'
+            AND COALESCE(u.current_load, 0) < COALESCE(u.max_load, 999999)
+            ${exclusions.length > 0 ? sql`AND NOT (u.id = ANY(${exclusions}))` : sql``}
+            ORDER BY workload ASC, distance ASC
+            LIMIT 1
+        `;
+
+        if (anyWithCapacity.length > 0) {
+            return anyWithCapacity[0];
+        }
+
+        const leastLoadedActive = await sql`
+            WITH officer_workload AS (
+                SELECT assigned_officer_id, COUNT(*) as active_issues
+                FROM issues
+                WHERE status IN ('Assigned', 'In Progress')
+                GROUP BY assigned_officer_id
+            )
+            SELECT u.id, u.email, u.name,
+            COALESCE(ow.active_issues, 0) as workload,
+            (
+                6371 * acos(
+                    cos(radians(${lat})) * cos(radians(u.latitude)) *
+                    cos(radians(u.longitude) - radians(${lon})) +
+                    sin(radians(${lat})) * sin(radians(u.latitude))
+                )
+            ) AS distance
+            FROM users u
+            LEFT JOIN officer_workload ow ON u.id = ow.assigned_officer_id
+            WHERE u.role = 'officer'
+            AND u.account_status = 'ACTIVE'
+            ${exclusions.length > 0 ? sql`AND NOT (u.id = ANY(${exclusions}))` : sql``}
+            ORDER BY workload ASC, distance ASC
+            LIMIT 1
+        `;
+
+        return leastLoadedActive.length > 0 ? leastLoadedActive[0] : null;
 
     } catch (err) {
         console.error("Error finding best officer:", err);
@@ -74,6 +134,11 @@ const findBestOfficer = async (category, lat, lon, excludeOfficerIds = []) => {
 const { sendNotification } = require('./notificationService');
 
 const assignOfficerToIssue = async (issueId, category, lat, lon, excludeOfficerIds = []) => {
+    if (!issueId) {
+        console.warn('[Auto-Assign] Skipping assignment because issueId is missing.');
+        return null;
+    }
+
     const bestOfficer = await findBestOfficer(category, lat, lon, excludeOfficerIds);
 
     if (bestOfficer) {

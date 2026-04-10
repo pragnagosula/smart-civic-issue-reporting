@@ -1,115 +1,75 @@
 const axios = require('axios');
-require('dotenv').config();
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5';
-const GEMINI_API_VERSION = process.env.GEMINI_API_VERSION || 'v1beta';
-const GEMINI_API_METHOD = process.env.GEMINI_API_METHOD || 'generateContent';
-const API_URL = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models/${GEMINI_MODEL}:${GEMINI_API_METHOD}?key=${GEMINI_API_KEY}`;
+const AI_BASE = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000';
 
-if (!GEMINI_API_KEY) {
-    console.warn('WARNING: GEMINI_API_KEY is not set. Translation API calls will fail.');
+async function translateToEnglishAndDetect(text) {
+    if (!text) {
+        return {
+            translatedText: '',
+            detectedLanguage: 'en',
+            wasTranslated: false
+        };
+    }
+
+    try {
+        const response = await axios.post(
+            `${AI_BASE}/translate`,
+            { text },
+            { timeout: 15000 }
+        );
+
+        return {
+            translatedText: response.data.translated_text || text,
+            detectedLanguage: response.data.detected_language || 'unknown',
+            wasTranslated: Boolean(response.data.was_translated)
+        };
+    } catch (error) {
+        console.error('Translation Service Error:', error.response?.data || error.message);
+        return {
+            translatedText: text,
+            detectedLanguage: 'unknown',
+            wasTranslated: false
+        };
+    }
 }
 
 /**
- * Translates text into English, Hindi, and Telugu using Gemini API.
- * Returns a JSON object with keys: en, hi, te.
- * Fallback: returns original text in all fields if translation fails.
+ * Returns translated variants for compatibility with existing schema.
+ * Hindi/Telugu are preserved as source text when local translation only targets English.
  */
 async function translateText(text) {
-    if (!text) return { en: "", hi: "", te: "" };
+    if (!text) return { en: '', hi: '', te: '' };
 
-    try {
-        const prompt = `
-            Translate the following text into English (en), Hindi (hi), and Telugu (te).
-            Output ONLY a valid JSON object with keys "en", "hi", "te".
-            Do not include Markdown formatting or code blocks.
-            Input text: "${text}"
-        `;
+    const result = await translateToEnglishAndDetect(text);
+    const english = result.translatedText || text;
 
-        const response = await axios.post(API_URL, {
-            contents: [{
-                parts: [{ text: prompt }]
-            }]
-        }, {
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        const rawOutput = response.data.candidates[0].content.parts[0].text;
-
-        // Clean up potential markdown code blocks
-        const jsonString = rawOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        const translations = JSON.parse(jsonString);
-
-        // Ensure all keys exist
-        return {
-            en: translations.en || text,
-            hi: translations.hi || text,
-            te: translations.te || text
-        };
-
-    } catch (error) {
-        console.error("Translation Service Error:", error.response?.data || error.message);
-        // Fallback: return original text for all languages
-        return {
-            en: text,
-            hi: text,
-            te: text
-        };
-    }
+    return {
+        en: english,
+        hi: text,
+        te: text
+    };
 }
 
-/**
- * Detects language of the text.
- * Returns language code (en, hi, te, or 'unknown').
- * This can also be done via Gemini or a library.
- * For simplicity/speed/cost, we'll ask Gemini in the same call or separate?
- * User requirement: "Detect language -> Translate -> Store".
- * We can ask Gemini to return detected language in the same JSON.
- */
 async function translateAndDetect(text) {
-    if (!text) return { translations: { en: "", hi: "", te: "" }, detectedLanguage: "en" };
-
-    try {
-        const prompt = `
-            Analyze the following text: "${text}"
-            1. Detect the language code (e.g., en, hi, te).
-            2. Translate it into English (en), Hindi (hi), and Telugu (te).
-            Output ONLY a valid JSON object with this structure:
-            {
-                "detectedOnly": "code",
-                "translations": {
-                    "en": "...",
-                    "hi": "...",
-                    "te": "..."
-                }
-            }
-            Do not include Markdown.
-        `;
-
-        const response = await axios.post(API_URL, {
-            contents: [{
-                parts: [{ text: prompt }]
-            }]
-        });
-
-        const rawOutput = response.data.candidates[0].content.parts[0].text;
-        const jsonString = rawOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-        const result = JSON.parse(jsonString);
-
+    if (!text) {
         return {
-            translations: result.translations,
-            detectedLanguage: result.detectedOnly || 'en'
-        };
-
-    } catch (error) {
-        console.error("Translation/Detection Error:", error.response?.data || error.message);
-        return {
-            translations: { en: text, hi: text, te: text },
-            detectedLanguage: 'en' // Default fallback
+            translations: { en: '', hi: '', te: '' },
+            detectedLanguage: 'en'
         };
     }
+
+    const result = await translateToEnglishAndDetect(text);
+    const english = result.translatedText || text;
+    const detectedLanguage = result.detectedLanguage === 'unknown' ? 'en' : result.detectedLanguage;
+
+    return {
+        translations: {
+            en: english,
+            hi: text,
+            te: text
+        },
+        detectedLanguage
+    };
 }
 
 module.exports = { translateText, translateAndDetect };

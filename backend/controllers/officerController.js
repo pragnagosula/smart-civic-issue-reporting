@@ -5,6 +5,8 @@ const cloudinary = require('cloudinary').v2;
 const { sendNotification } = require('../services/notificationService');
 const { sendEmail } = require('../utils/emailService');
 
+const AI_BASE = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000';
+
 // 🔐 Cloudinary config
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -94,7 +96,7 @@ const registerOfficer = async (req, res) => {
 
             console.log("📤 Sending to AI service...");
             const aiResponse = await axios.post(
-                "http://localhost:8000/screen-officer",
+                `${AI_BASE}/screen-officer`,
                 aiPayload,
                 { timeout: 10000 }
             );

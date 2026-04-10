@@ -3,6 +3,8 @@ const axios = require('axios');
 const cloudinary = require('cloudinary').v2;
 const { translateText, translateAndDetect } = require('../services/translationService');
 
+const AI_BASE = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000';
+
 // Cloudinary config
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -96,7 +98,7 @@ exports.reportIssue = async (req, res) => {
 
         try {
             const aiResponse = await axios.post(
-                'http://localhost:8000/analyze',
+                `${AI_BASE}/analyze`,
                 {
                     image,
                     text: (translations && translations.en) ? translations.en : (voiceText || '') // Enforce English for AI
@@ -143,7 +145,7 @@ exports.reportIssue = async (req, res) => {
 
                 if (candidates.length > 0) {
                     // Step 2: Call AI Semantic Check
-                    const dupCheck = await axios.post('http://localhost:8000/check-duplicate', {
+                    const dupCheck = await axios.post(`${AI_BASE}/check-duplicate`, {
                         new_text: (translations && translations.en) ? translations.en : (voiceText || ''), // Enforce English for DupCheck
                         new_lat: latitude,
                         new_lng: longitude,
@@ -165,38 +167,6 @@ exports.reportIssue = async (req, res) => {
             } catch (dupErr) {
                 console.error("Duplicate check failed:", dupErr.message);
                 // Fail safe: proceed as new issue
-            }
-        }
-
-        // ------------------------------
-        // 4.5 👮 Officer Assignment (One-Time)
-        // ------------------------------
-        // Only run if Verified (Reported) and NOT a Duplicate
-        let assignedOfficerId = null;
-        let assignedAt = null;
-
-        if (issueStatus === 'Reported' && !masterIssueId) {
-            try {
-                // Use new Auto-Assign Service
-                const assignmentService = require('../services/assignmentService');
-                const officer = await assignmentService.assignOfficerToIssue(null, aiResult.category, latitude, longitude);
-                // Note: assignOfficerToIssue needs an ID to update.
-                // But here we haven't INSERTED yet.
-                // Logic change: We should FIND the officer first, then INSERT with the ID.
-
-                // Let's use `findBestOfficer` directly here to get ID for INSERT.
-                // Then we don't need to update later.
-                const bestOfficer = await assignmentService.findBestOfficer(aiResult.category, latitude, longitude);
-
-                if (bestOfficer) {
-                    assignedOfficerId = bestOfficer.id;
-                    issueStatus = 'Assigned'; // Update status immediately
-                    assignedAt = new Date();
-                    console.log(`[Report] Auto-assigned to ${bestOfficer.name}`);
-                }
-
-            } catch (assignErr) {
-                console.error("Officer assignment failed:", assignErr.message);
             }
         }
 
@@ -238,13 +208,42 @@ exports.reportIssue = async (req, res) => {
                 ${aiResult.ai_confidence},
                 ${aiResult.ai_reason},
                 ${masterIssueId},
-                ${assignedOfficerId},
-                ${assignedAt}
+                ${null},
+                ${null}
             )
             RETURNING id, category, status, timestamp, ai_status, master_issue_id, assigned_officer_id
         `;
 
         const newIssueId = issues[0].id;
+
+        // ------------------------------
+        // 5.5 👮 Officer Assignment (Post-Insert)
+        // ------------------------------
+        if (issueStatus === 'Reported' && !masterIssueId) {
+            try {
+                const assignmentService = require('../services/assignmentService');
+                const assignedOfficer = await assignmentService.assignOfficerToIssue(
+                    newIssueId,
+                    aiResult.category,
+                    Number(latitude),
+                    Number(longitude)
+                );
+
+                if (assignedOfficer) {
+                    const refreshedIssue = await sql`
+                        SELECT id, category, status, timestamp, ai_status, master_issue_id, assigned_officer_id
+                        FROM issues
+                        WHERE id = ${newIssueId}
+                    `;
+                    if (refreshedIssue.length > 0) {
+                        issues[0] = refreshedIssue[0];
+                        issueStatus = refreshedIssue[0].status;
+                    }
+                }
+            } catch (assignErr) {
+                console.error('Officer assignment failed:', assignErr.message);
+            }
+        }
 
         // ------------------------------
         // 6️⃣ Update Crowdsourcing Map & Impact Metrics

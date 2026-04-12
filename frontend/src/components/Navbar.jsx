@@ -26,6 +26,7 @@ const Navbar = () => {
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('language');
+        i18n.changeLanguage('en');
         navigate('/login');
     };
 

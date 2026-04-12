@@ -108,6 +108,7 @@ const AdminDashboard = () => {
 
     const handleLogout = () => {
         localStorage.clear();
+        import('../i18n').then(module => module.default.changeLanguage('en'));
         navigate('/login');
     };
 

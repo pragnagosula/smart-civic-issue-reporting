@@ -23,8 +23,6 @@ const Signup = () => {
     const handleLanguageChange = (e) => {
         const lang = e.target.value;
         setFormData({ ...formData, preferred_language: lang });
-        // i18n.changeLanguage(lang); // Comment out if i18n not used
-        localStorage.setItem('language', lang);
     };
 
     const handleSubmit = async (e) => {

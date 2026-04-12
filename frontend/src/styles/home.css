@@ -140,7 +140,7 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
     background: linear-gradient(135deg, #1E40AF 0%, #2563EB 100%);
     color: white !important;
     padding: 0.7rem 1.8rem;
-    border-radius: 10px;
+    border-radius: 50px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     font-weight: 700;
     box-shadow: 0 4px 15px rgba(30, 64, 175, 0.2);
@@ -256,7 +256,7 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
     background: linear-gradient(135deg, #1E40AF 0%, #2563EB 100%);
     color: white !important;
     margin: 0.5rem 1rem;
-    border-radius: 10px;
+    border-radius: 50px;
     text-align: center;
     border-bottom: none;
 }
@@ -424,8 +424,12 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
     display: flex;
     gap: 1.5rem;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
+}
+
+.hero-buttons .btn {
+    width: 260px; /* Equal size for both buttons */
 }
 
 .btn {
@@ -437,13 +441,13 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
     font-size: 1.05rem;
     font-weight: 700;
     border: none;
-    border-radius: 14px;
+    border-radius: 50px;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.34, 1, 0.66, 1);
     text-decoration: none;
     position: relative;
     overflow: hidden;
-    min-width: 220px;
+    width: fit-content;
     white-space: nowrap;
 }
 
@@ -481,16 +485,16 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
 }
 
 .btn-secondary {
-    background: #1E40AF;
-    color: white;
-    border: 2px solid transparent;
-    box-shadow: 0 8px 24px rgba(30, 64, 175, 0.22);
+    background: #FFFFFF;
+    color: #1E40AF !important;
+    border: 2px solid #1E40AF;
+    box-shadow: 0 8px 24px rgba(30, 64, 175, 0.12);
 }
 
 .btn-secondary:hover {
-    background: #2563EB;
+    background: #F3F4F6;
     transform: translateY(-4px);
-    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.28);
+    box-shadow: 0 14px 30px rgba(30, 64, 175, 0.18);
 }
 
 .btn-lg {
@@ -721,7 +725,7 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
 .steps-container {
     display: flex;
     justify-content: center;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 1.5rem;
     max-width: 1300px;
     margin: 0 auto;
@@ -752,6 +756,8 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
     text-align: center;
     position: relative;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .step:hover {
@@ -905,9 +911,15 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
 
 .footer-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: 2fr 1fr 1fr 1fr;
     gap: 3.5rem;
     margin-bottom: 4rem;
+}
+
+@media (max-width: 900px) {
+    .footer-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
 }
 
 .footer-col {
@@ -964,10 +976,13 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
     list-style: none;
     padding: 0;
     margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
 }
 
 .footer-links li {
-    margin-bottom: 0.85rem;
+    margin: 0;
 }
 
 .footer-links a {
@@ -1006,6 +1021,36 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
     margin: 0;
 }
 
+.social-links {
+    display: flex;
+    gap: 1.2rem;
+    align-items: center;
+}
+
+.social-links a {
+    color: #9CA3AF;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.social-links a:hover {
+    color: #FFFFFF;
+    background: #3B82F6;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.social-links svg {
+    width: 20px;
+    height: 20px;
+}
+
 
 /* Responsive Design */
 @media (max-width: 1200px) {
@@ -1041,12 +1086,6 @@ h1, h2, h3, h4, .logo-text, .hero-stat-value {
     .hero-buttons {
         justify-content: center;
         gap: 1rem;
-    }
-
-    .hero-buttons .btn {
-        flex: 1;
-        min-width: 200px;
-        max-width: 250px;
     }
 
     .hero-visual {

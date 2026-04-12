@@ -12,6 +12,7 @@ import {
   ArcElement
 } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
+import IssueMap from '../components/IssueMap';
 import '../styles/AdminDashboard.css';
 
 ChartJS.register(
@@ -204,6 +205,7 @@ const AdminDashboard = () => {
                 <div className="tabs-container">
                     <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>Overview</button>
                     <button className={`tab-btn ${activeTab === 'issues' ? 'active' : ''}`} onClick={() => setActiveTab('issues')}>Issues Management</button>
+                    <button className={`tab-btn ${activeTab === 'map' ? 'active' : ''}`} onClick={() => setActiveTab('map')}>System Map</button>
                     <button className={`tab-btn ${activeTab === 'officers' ? 'active' : ''}`} onClick={() => setActiveTab('officers')}>Officers List</button>
                     <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>Analytics</button>
                 </div>
@@ -327,6 +329,18 @@ const AdminDashboard = () => {
                     <IssuesTable issues={issues} officers={officers} />
                 </section>
                 </>
+                )}
+
+                {activeTab === 'map' && (
+                    <section className="dashboard-section">
+                        <div className="section-header">
+                            <h2 className="section-title">City-wide Live Map</h2>
+                            <p className="section-subtitle">Real-time geospatial view of all reported civic issues</p>
+                        </div>
+                        <div style={{ padding: '0', background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #e5e7eb' }}>
+                            <IssueMap issues={issues} height="700px" />
+                        </div>
+                    </section>
                 )}
 
                 {activeTab === 'officers' && (

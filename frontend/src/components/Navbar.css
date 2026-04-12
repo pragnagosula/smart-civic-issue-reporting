@@ -87,9 +87,33 @@
     transition: all 0.2s ease;
 }
 
-.logout-btn:hover {
+.language-selector {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 120px;
+}
+
+.language-selector:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: white;
+}
+
+.language-selector:focus {
+    outline: none;
+    border-color: white;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.language-selector option {
+    background: #1565c0;
+    color: white;
 }
 
 @media (prefers-color-scheme: dark) {

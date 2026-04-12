@@ -1,0 +1,70 @@
+.issue-map-container {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.map-popup-card {
+  min-width: 200px;
+  max-width: 250px;
+}
+
+.map-popup-card h4 {
+  margin: 0 0 8px 0;
+  color: #1a1a1a;
+  font-size: 16px;
+  font-weight: 600;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 6px;
+}
+
+.popup-desc {
+  font-size: 13px;
+  color: #4a5568;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.popup-status {
+  margin-bottom: 12px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.view-details-btn {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.view-details-btn:hover {
+  background-color: #1d4ed8;
+}
+
+/* Fix leaflet popup close button */
+.leaflet-popup-content-wrapper {
+  border-radius: 10px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.leaflet-popup-close-button {
+  color: #6b7280 !important;
+}

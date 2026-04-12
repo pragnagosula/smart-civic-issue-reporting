@@ -68,4 +68,7 @@ router.post('/officer-register', upload.single('document'), officerController.re
 // FCM Token Update
 router.post('/fcm-token', authMiddleware, authController.updateFcmToken);
 
+// Language Update
+router.post('/update-language', authMiddleware, authController.updateLanguage);
+
 module.exports = router;

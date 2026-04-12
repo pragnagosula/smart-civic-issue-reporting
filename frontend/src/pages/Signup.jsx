@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-// import { useTranslation } from 'react-i18next'; // Comment out if not used
+import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import '../styles/AuthStyles.css';
 
 const Signup = () => {
-    // const { t, i18n } = useTranslation(); // Comment out if not used
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         name: '',
@@ -79,20 +79,20 @@ const Signup = () => {
 
                     <form onSubmit={handleSubmit}>
                         <div className="input-group">
-                            <label>Full Name</label>
+                            <label>{t('name')}</label>
                             <input
                                 type="text"
                                 name="name"
                                 className="input-field"
                                 value={formData.name}
                                 onChange={handleChange}
-                                placeholder="Enter your full name"
+                                placeholder={t('name').toLowerCase()}
                                 required
                             />
                         </div>
 
                         <div className="input-group">
-                            <label>Email Address</label>
+                            <label>{t('email')}</label>
                             <input
                                 type="email"
                                 name="email"
@@ -105,7 +105,7 @@ const Signup = () => {
                         </div>
 
                         <div className="input-group">
-                            <label>Phone Number (Optional)</label>
+                            <label>{t('phone')}</label>
                             <input
                                 type="tel"
                                 name="phone"
@@ -117,7 +117,7 @@ const Signup = () => {
                         </div>
 
                         <div className="input-group">
-                            <label>Preferred Language</label>
+                            <label>{t('language')}</label>
                             <select
                                 name="preferred_language"
                                 className="input-field"
@@ -139,10 +139,10 @@ const Signup = () => {
                             {loading ? (
                                 <>
                                     <span className="loader"></span>
-                                    Creating Account...
+                                    {t('creating_account')}
                                 </>
                             ) : (
-                                'Create Account'
+                                t('create_account')
                             )}
                         </button>
                     </form>
@@ -151,7 +151,7 @@ const Signup = () => {
 
                     <div className="footer-links">
                         <Link to="/login" className="link">
-                            Already have an account?
+                            {t('already_have_account')}
                         </Link>
                     </div>
                 </div>

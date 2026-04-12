@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import '../styles/home.css';
 
 const Home = () => {
+    const [isMenuOpen, setIsMenuOpen] = React.useState(false);
     return (
         <div className="home-page">
             {/* Government Official Navbar */}
@@ -28,6 +29,23 @@ const Home = () => {
                         <Link to="/login" className="nav-link">Login</Link>
                         <Link to="/signup" className="nav-link signup-btn">Get Started</Link>
                     </div>
+                    {/* Mobile Menu Button */}
+                    <button 
+                        className="mobile-menu-btn"
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        aria-label="Toggle menu"
+                    >
+                        <span className={`hamburger ${isMenuOpen ? 'open' : ''}`}></span>
+                    </button>
+                </div>
+                
+                {/* Mobile Menu */}
+                <div className={`mobile-menu ${isMenuOpen ? 'open' : ''}`}>
+                    <Link to="/" className="mobile-nav-link active" onClick={() => setIsMenuOpen(false)}>Home</Link>
+                    <a href="#about" className="mobile-nav-link" onClick={() => setIsMenuOpen(false)}>About</a>
+                    <a href="#features" className="mobile-nav-link" onClick={() => setIsMenuOpen(false)}>Features</a>
+                    <Link to="/login" className="mobile-nav-link" onClick={() => setIsMenuOpen(false)}>Login</Link>
+                    <Link to="/signup" className="mobile-nav-link mobile-signup-btn" onClick={() => setIsMenuOpen(false)}>Get Started</Link>
                 </div>
             </nav>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import IssueMap from '../components/IssueMap';
 import '../styles/Dashboard.css';
 
 const Dashboard = () => {
@@ -25,6 +26,7 @@ const Dashboard = () => {
     const [categoryStats, setCategoryStats] = useState({});
 
     const [tab, setTab] = useState('my');
+    const [viewMode, setViewMode] = useState('list');
     const [allIssues, setAllIssues] = useState([]);
     const [allLoading, setAllLoading] = useState(true);
     const [searchText, setSearchText] = useState('');
@@ -40,6 +42,15 @@ const Dashboard = () => {
         fetchAllIssues();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        // Re-fetch issues when language changes
+        fetchIssues();
+        if (tab === 'all') {
+            fetchAllIssues();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [i18n.language]);
 
     useEffect(() => {
         if (tab === 'all') {
@@ -164,7 +175,7 @@ const Dashboard = () => {
         return (
             <div className="loading-overlay">
                 <div className="spinner"></div>
-                <p style={{ marginTop: '1.5rem', color: '#616161', fontSize: '1rem' }}>Loading Dashboard...</p>
+                <p style={{ marginTop: '1.5rem', color: '#616161', fontSize: '1rem' }}>{t('loading_dashboard')}</p>
             </div>
         );
     }
@@ -183,8 +194,8 @@ const Dashboard = () => {
                     </div>
                     
                     <div className="gov-header-title-section">
-                        <h1 className="gov-title">CivicFix Citizen Portal</h1>
-                        <p className="gov-subtitle">Government of India | Civic Issue Management</p>
+                        <h1 className="gov-title">{t('civicfix_portal')}</h1>
+                        <p className="gov-subtitle">{t('gov_subtitle')}</p>
                     </div>
                     
                     <div className="gov-header-actions">
@@ -193,7 +204,7 @@ const Dashboard = () => {
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                                 <circle cx="12" cy="7" r="4" />
                             </svg>
-                            Profile
+                            {t('profile')}
                         </button>
                         <button className="btn btn-logout no-print" onClick={handleLogout}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -201,7 +212,7 @@ const Dashboard = () => {
                                 <polyline points="16 17 21 12 16 7" />
                                 <line x1="21" y1="12" x2="9" y2="12" />
                             </svg>
-                            Logout
+                            {t('logout')}
                         </button>
                     </div>
                 </div>
@@ -211,8 +222,8 @@ const Dashboard = () => {
                 {/* System Overview Statistics */}
                 <section className="dashboard-section">
                     <div className="section-header">
-                        <h2 className="section-title">Dashboard Overview</h2>
-                        <p className="section-subtitle">Summary of your reported civic issues and their current status</p>
+                        <h2 className="section-title">{t('dashboard_overview')}</h2>
+                        <p className="section-subtitle">{t('summary_subtitle')}</p>
                     </div>
 
                     <div className="stats-grid">
@@ -225,8 +236,8 @@ const Dashboard = () => {
                             </div>
                             <div className="stat-content">
                                 <div className="stat-value">{stats.total}</div>
-                                <div className="stat-label">Total Issues</div>
-                                <div className="stat-meta">all time</div>
+                                <div className="stat-label">{t('total_issues')}</div>
+                                <div className="stat-meta">{t('all_time')}</div>
                             </div>
                         </article>
 
@@ -239,8 +250,8 @@ const Dashboard = () => {
                             </div>
                             <div className="stat-content">
                                 <div className="stat-value">{stats.resolved}</div>
-                                <div className="stat-label">Resolved</div>
-                                <div className="stat-meta">completed</div>
+                                <div className="stat-label">{t('resolved')}</div>
+                                <div className="stat-meta">{t('completed')}</div>
                             </div>
                         </article>
 
@@ -253,8 +264,8 @@ const Dashboard = () => {
                             </div>
                             <div className="stat-content">
                                 <div className="stat-value">{stats.inProgress}</div>
-                                <div className="stat-label">In Progress</div>
-                                <div className="stat-meta">being worked on</div>
+                                <div className="stat-label">{t('in_progress')}</div>
+                                <div className="stat-meta">{t('active')}</div>
                             </div>
                         </article>
 
@@ -268,8 +279,8 @@ const Dashboard = () => {
                             </div>
                             <div className="stat-content">
                                 <div className="stat-value">{stats.pending}</div>
-                                <div className="stat-label">Pending</div>
-                                <div className="stat-meta">awaiting assignment</div>
+                                <div className="stat-label">{t('pending')}</div>
+                                <div className="stat-meta">{t('awaiting')}</div>
                             </div>
                         </article>
                     </div>
@@ -279,8 +290,8 @@ const Dashboard = () => {
                 {Object.keys(categoryStats).length > 0 && (
                     <section className="dashboard-section">
                         <div className="section-header">
-                            <h2 className="section-title">Issues by Category</h2>
-                            <p className="section-subtitle">Breakdown of your reports by issue type</p>
+                            <h2 className="section-title">{t('issues_by_category')}</h2>
+                            <p className="section-subtitle">{t('breakdown_subtitle')}</p>
                         </div>
 
                         <div className="category-cards-grid">
@@ -289,7 +300,7 @@ const Dashboard = () => {
                                     <div className="category-card-icon">{getCategoryIcon(cat)}</div>
                                     <div className="category-card-content">
                                         <div className="category-card-name">{cat}</div>
-                                        <div className="category-card-count">{count} {count === 1 ? 'issue' : 'issues'}</div>
+                                        <div className="category-card-count">{count} {count === 1 ? t('issue') : t('issues')}</div>
                                     </div>
                                 </div>
                             ))}
@@ -329,6 +340,20 @@ const Dashboard = () => {
                                 onClick={() => setTab('all')}
                             >
                                 All Issues
+                            </button>
+                        </div>
+                        <div className="view-toggle" style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                            <button 
+                                className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setViewMode('list')}
+                            >
+                                List View
+                            </button>
+                            <button 
+                                className={`btn ${viewMode === 'map' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setViewMode('map')}
+                            >
+                                Map View
                             </button>
                         </div>
                     </div>
@@ -391,6 +416,10 @@ const Dashboard = () => {
                                     Report Your First Issue
                                 </button>
                             )}
+                        </div>
+                    ) : viewMode === 'map' ? (
+                        <div style={{ marginTop: '20px' }}>
+                            <IssueMap issues={tab === 'my' ? issues : allIssues} height="600px" />
                         </div>
                     ) : (
                         <div className="issues-grid">

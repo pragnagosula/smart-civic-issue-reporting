@@ -442,29 +442,20 @@ exports.getAllIssues = async (req, res) => {
         const { search, status, category } = req.query;
         const userLang = req.user.language || req.user.preferred_language || 'en';
 
-        const whereClauses = [sql`status != 'Flagged'`];
-        const bindings = [];
-
-        if (status) {
-            whereClauses.push(sql`LOWER(status) = LOWER(${status})`);
-        }
-
-        if (category) {
-            whereClauses.push(sql`LOWER(category) = LOWER(${category})`);
-        }
-
-        if (search) {
-            const searchTerm = `%${search}%`;
-            whereClauses.push(sql`(
-                LOWER(COALESCE(voice_text, '')) LIKE LOWER(${searchTerm})
-                OR LOWER(COALESCE(CASE WHEN json_typeof(description) = 'object' THEN description->>'en' ELSE description END, '')) LIKE LOWER(${searchTerm})
-            )`);
-        }
+        const pStatus = status || null;
+        const pCategory = category || null;
+        const pSearch = search ? `%${search}%` : null;
 
         const issues = await sql`
             SELECT id, category, status, timestamp, voice_text, description, latitude, longitude, language, created_at, ai_status
             FROM issues
-            WHERE ${sql.join(whereClauses, sql` AND `)}
+            WHERE status != 'Flagged'
+            AND (${pStatus}::text IS NULL OR LOWER(status) = LOWER(${pStatus}::text))
+            AND (${pCategory}::text IS NULL OR LOWER(category) = LOWER(${pCategory}::text))
+            AND (${pSearch}::text IS NULL OR 
+                LOWER(COALESCE(voice_text, '')) LIKE LOWER(${pSearch}::text)
+                OR LOWER(COALESCE(CASE WHEN jsonb_typeof(to_jsonb(description)) = 'object' THEN description->>'en' ELSE description::text END, '')) LIKE LOWER(${pSearch}::text)
+            )
             ORDER BY created_at DESC
         `;
 
@@ -488,6 +479,9 @@ exports.getIssueDetails = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user.id;
+        const userRole = req.user.role;
+
+        console.log(`User ${userId} (${userRole}) trying to access issue ${id}`);
 
         const issues = await sql`
             SELECT i.*, 
@@ -505,15 +499,9 @@ exports.getIssueDetails = async (req, res) => {
         }
 
         const issue = issues[0];
-        const allowedToView = issue.citizen_id === userId
-            || issue.assigned_officer_id === userId
-            || issue.is_linked
-            || req.user.role === 'admin';
 
-        if (!allowedToView) {
-            return res.status(403).json({ message: 'Unauthorized access to this issue' });
-        }
-
+        // All authenticated users may view issue details.
+        // Authorization checks for update/delete operations remain separate.
         const userLang = req.user.language || req.user.preferred_language || 'en';
 
         const desc = getLocalizedText(issue.description, userLang);
@@ -555,12 +543,7 @@ exports.getIssueDetails = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
-
-// Admin function to get ALL details (just in case needed here, though adminController usually handles it)
-exports.getAllIssues = async (req, res) => {
-    // This logic is usually in adminController, checking just in case.
-};
-
+// Removed duplicate empty getAllIssues
 exports.assignIssue = async (req, res) => {
     try {
         if (req.user.role !== 'admin') {

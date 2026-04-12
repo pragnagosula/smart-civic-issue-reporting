@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar';
+import IssueMap from '../components/IssueMap';
 import '../styles/OfficerDashboard.css';
 
 const OfficerDashboard = () => {
@@ -10,6 +11,7 @@ const OfficerDashboard = () => {
     const navigate = useNavigate();
     const [issues, setIssues] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState('list');
     const [showResolveModal, setShowResolveModal] = useState(false);
     const [selectedIssueId, setSelectedIssueId] = useState(null);
     const [resolutionImage, setResolutionImage] = useState(null);
@@ -128,12 +130,30 @@ const OfficerDashboard = () => {
                     <div className="section-header">
                         <h2 className="section-title">Assigned & Department Issues</h2>
                         <p className="section-subtitle">Manage and update issue status</p>
+                        <div className="view-toggle" style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                            <button 
+                                className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setViewMode('list')}
+                            >
+                                List View
+                            </button>
+                            <button 
+                                className={`btn ${viewMode === 'map' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setViewMode('map')}
+                            >
+                                Map View
+                            </button>
+                        </div>
                     </div>
 
                     {loading ? (
                         <div className="loading-state">Loading issues...</div>
                     ) : issues.length === 0 ? (
                         <div className="empty-state">No issues found for your department.</div>
+                    ) : viewMode === 'map' ? (
+                        <div style={{ marginTop: '20px' }}>
+                            <IssueMap issues={issues} height="600px" />
+                        </div>
                     ) : (
                         <div className="issues-list">
                             {issues.map(issue => {

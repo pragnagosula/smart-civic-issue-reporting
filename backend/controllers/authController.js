@@ -226,3 +226,34 @@ exports.updateFcmToken = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+exports.updateLanguage = async (req, res) => {
+    try {
+        const { language } = req.body;
+        if (!['en', 'hi', 'te'].includes(language)) {
+            return res.status(400).json({ message: 'Invalid language' });
+        }
+
+        await sql`UPDATE users SET preferred_language = ${language} WHERE id = ${req.user.id}`;
+
+        // Generate new token with updated language
+        const userResult = await sql`SELECT * FROM users WHERE id = ${req.user.id}`;
+        const user = userResult[0];
+        const token = generateToken(user.id, user.email, user.role, user.preferred_language, user.department);
+
+        res.json({
+            message: 'Language updated successfully',
+            token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                preferred_language: user.preferred_language
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};

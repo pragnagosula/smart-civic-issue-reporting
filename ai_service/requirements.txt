@@ -5,3 +5,6 @@ Pillow
 torch
 numpy
 requests
+transformers
+langdetect
+sentencepiece

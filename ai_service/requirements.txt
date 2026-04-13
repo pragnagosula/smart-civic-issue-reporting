@@ -1,12 +1,9 @@
 fastapi
 uvicorn
 pydantic
-transformers
 sentence-transformers
-Pillow
-torch
-numpy
-requests
 transformers
+torch
+Pillow
 langdetect
-sentencepiece
+accelerate

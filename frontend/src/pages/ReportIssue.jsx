@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useTranslation } from 'react-i18next';
 import '../styles/ReportIssue.css';
 
 const ReportIssue = () => {
-    const { t } = useTranslation();
     const navigate = useNavigate();
 
     // State

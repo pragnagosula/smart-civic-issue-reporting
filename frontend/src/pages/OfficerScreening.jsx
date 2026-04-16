@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import '../styles/AuthStyles.css'; // reuse auth styles
 
 const OfficerScreening = () => {

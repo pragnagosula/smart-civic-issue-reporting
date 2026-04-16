@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import '../styles/OfficerRegister.css';
 
 const OfficerRegister = () => {
-    const { t } = useTranslation();
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         name: '',

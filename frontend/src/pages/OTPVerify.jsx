@@ -78,8 +78,8 @@ const OTPVerify = () => {
         }
 
         const endpoint = isSignup
-            ? 'http://localhost:5000/api/auth/verify-otp'
-            : 'http://localhost:5000/api/auth/login-verify';
+            ? ${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/verify-otp`
+            : ${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/login-verify`;
 
         try {
             const response = await axios.post(endpoint, { email, otp: otpString });
@@ -116,7 +116,7 @@ const OTPVerify = () => {
     const handleResend = async () => {
         try {
             setLoading(true);
-            await axios.post('http://localhost:5000/api/auth/send-otp', { email });
+            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/send-otp`, { email });
             setTimer(300);
             setOtp(['', '', '', '', '', '']);
             setError('');

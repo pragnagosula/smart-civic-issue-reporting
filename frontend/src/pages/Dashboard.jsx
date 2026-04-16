@@ -25,6 +25,7 @@ const Dashboard = () => {
     });
     const [categoryStats, setCategoryStats] = useState({});
 
+    const [mainTab, setMainTab] = useState('overview');
     const [tab, setTab] = useState('my');
     const [viewMode, setViewMode] = useState('list');
     const [allIssues, setAllIssues] = useState([]);
@@ -62,7 +63,7 @@ const Dashboard = () => {
     const fetchIssues = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:5000/api/issues/my-issues', {
+            const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/my-issues`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const issuesData = response.data;
@@ -99,7 +100,7 @@ const Dashboard = () => {
             if (activeFilters.search) params.append('search', activeFilters.search);
             if (activeFilters.status) params.append('status', activeFilters.status);
             if (activeFilters.category) params.append('category', activeFilters.category);
-            const response = await axios.get(`http://localhost:5000/api/issues/all?${params.toString()}`, {
+            const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/all?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setAllIssues(response.data);
@@ -220,8 +221,17 @@ const Dashboard = () => {
                 </div>
             </header>
 
+            <div className="citizen-tabs">
+                <div className="tabs-container">
+                    <button className={`tab-btn ${mainTab === 'overview' ? 'active' : ''}`} onClick={() => setMainTab('overview')}>{t('dashboard_overview') || 'Dashboard Overview'}</button>
+                    {Object.keys(categoryStats).length > 0 && <button className={`tab-btn ${mainTab === 'categories' ? 'active' : ''}`} onClick={() => setMainTab('categories')}>{t('issues_by_category') || 'Issues by Category'}</button>}
+                    <button className={`tab-btn ${mainTab === 'tracker' ? 'active' : ''}`} onClick={() => setMainTab('tracker')}>Citizen Issue Tracker</button>
+                </div>
+            </div>
+
             <main className="dashboard-container">
                 {/* System Overview Statistics */}
+                {mainTab === 'overview' && (
                 <section className="dashboard-section">
                     <div className="section-header">
                         <h2 className="section-title">{t('dashboard_overview')}</h2>
@@ -287,9 +297,10 @@ const Dashboard = () => {
                         </article>
                     </div>
                 </section>
+                )}
 
                 {/* Category Breakdown */}
-                {Object.keys(categoryStats).length > 0 && (
+                {mainTab === 'categories' && Object.keys(categoryStats).length > 0 && (
                     <section className="dashboard-section">
                         <div className="section-header">
                             <h2 className="section-title">{t('issues_by_category')}</h2>
@@ -311,6 +322,8 @@ const Dashboard = () => {
                 )}
 
                 {/* Report New Issue CTA */}
+                {mainTab === 'tracker' && (
+                <>
                 <section className="dashboard-section">
                     <div className="cta-container">
                         <button className="btn-report-large" onClick={handleReportIssue}>
@@ -471,6 +484,8 @@ const Dashboard = () => {
                         </div>
                     )}
                 </section>
+                </>
+                )}
             </main>
         </div>
     );

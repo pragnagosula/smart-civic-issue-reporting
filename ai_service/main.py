@@ -8,73 +8,39 @@ import uvicorn
 import base64
 import io
 import torch
-import threading
 from langdetect import detect as detect_lang
 
 app = FastAPI()
 
-# Runtime-loaded model handles. Keeping these as None at import-time avoids
-# blocking server boot, which is important for platforms that enforce port
-# scan deadlines (e.g., Render).
+# ===============================
+# LOAD MODELS (DEFERRED)
+# ===============================
 text_model = None
 clip_model = None
 clip_processor = None
 translate_tokenizer = None
 translate_model = None
 
-MODELS_READY = False
-MODEL_LOAD_ERROR = None
-_MODEL_LOCK = threading.Lock()
-
-# ===============================
-# LOAD MODELS
-# ===============================
-TRANSLATION_MODEL = "Helsinki-NLP/opus-mt-mul-en"
-
-
-def _load_models_once():
-    global text_model, clip_model, clip_processor
-    global translate_tokenizer, translate_model
-    global MODELS_READY, MODEL_LOAD_ERROR
-
-    if MODELS_READY:
-        return
-
-    with _MODEL_LOCK:
-        if MODELS_READY:
-            return
-        try:
-            print("Loading SentenceTransformer...")
-            text_model = SentenceTransformer("all-MiniLM-L6-v2")
-            print("SentenceTransformer Loaded.")
-
-            print("Loading CLIP...")
-            clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-            clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-            print("CLIP Loaded.")
-
-            print("Loading translation model...")
-            translate_tokenizer = MarianTokenizer.from_pretrained(TRANSLATION_MODEL)
-            translate_model = MarianMTModel.from_pretrained(TRANSLATION_MODEL)
-            print("Translation model loaded.")
-
-            MODELS_READY = True
-            MODEL_LOAD_ERROR = None
-        except Exception as exc:
-            MODEL_LOAD_ERROR = str(exc)
-            print("Model loading failed:", exc)
-
-
-def ensure_models_ready():
-    if not MODELS_READY:
-        _load_models_once()
-    if not MODELS_READY:
-        raise HTTPException(status_code=503, detail=f"Models not ready: {MODEL_LOAD_ERROR or 'Loading in progress'}")
-
-
 @app.on_event("startup")
-def warm_models_in_background():
-    threading.Thread(target=_load_models_once, daemon=True).start()
+def load_models():
+    global text_model, clip_model, clip_processor, translate_tokenizer, translate_model
+    try:
+        print("Loading SentenceTransformer...")
+        text_model = SentenceTransformer("all-MiniLM-L6-v2")
+        print("SentenceTransformer Loaded.")
+
+        print("Loading CLIP...")
+        clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+        clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+        print("CLIP Loaded.")
+
+        print("Loading translation model...")
+        TRANSLATION_MODEL = "Helsinki-NLP/opus-mt-mul-en"
+        translate_tokenizer = MarianTokenizer.from_pretrained(TRANSLATION_MODEL)
+        translate_model = MarianMTModel.from_pretrained(TRANSLATION_MODEL)
+        print("Translation model loaded.")
+    except Exception as e:
+        print(f"Failed to load models during startup: {e}")
 
 # ===============================
 # DEPARTMENT KNOWLEDGE BASE
@@ -223,7 +189,6 @@ class TranslationRequest(BaseModel):
 @app.post("/analyze")
 def analyze_issue(request: IssueAnalysisRequest):
     try:
-        ensure_models_ready()
 
         image_result = None
         text_result = None
@@ -299,7 +264,6 @@ def analyze_issue(request: IssueAnalysisRequest):
 def screen_officer(request: OfficerScreeningRequest):
 
     try:
-        ensure_models_ready()
         department = normalize(request.department)
 
         if department not in DEPARTMENT_PROFILES:
@@ -334,7 +298,6 @@ def screen_officer(request: OfficerScreeningRequest):
 def check_duplicate(request: DuplicateCheckRequest):
 
     try:
-        ensure_models_ready()
         if not request.candidates:
             return {
                 "is_duplicate": False,
@@ -374,7 +337,6 @@ def check_duplicate(request: DuplicateCheckRequest):
 @app.post("/translate")
 def translate(request: TranslationRequest):
     try:
-        ensure_models_ready()
         detected = detect_lang(request.text)
         if detected == "en":
             return {
@@ -410,12 +372,10 @@ def translate(request: TranslationRequest):
 
 @app.get("/")
 def health():
-    return {
-        "status": "AI Service Running",
-        "models_ready": MODELS_READY,
-        "model_error": MODEL_LOAD_ERROR
-    }
+    return {"status": "AI Service Running"}
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

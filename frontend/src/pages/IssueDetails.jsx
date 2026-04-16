@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import jwtDecode from 'jwt-decode';
 import { useTranslation } from 'react-i18next';
-import Navbar from '../components/Navbar'; // optional, if you want top navbar
-import '../styles/IssueDetails.css'; // new dedicated styles
+import Navbar from '../components/Navbar';
+import '../styles/Dashboard.css'; // Inherit gov styles
+import '../styles/IssueDetails.css';
 
 const IssueDetails = () => {
     const { t, i18n } = useTranslation();
@@ -40,7 +41,7 @@ const IssueDetails = () => {
     const fetchIssueDetails = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/issues/${id}`, {
+            const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const issueData = response.data;
@@ -67,7 +68,7 @@ const IssueDetails = () => {
         setActionLoading(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`http://localhost:5000/api/issues/${id}/comment`,
+            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}/comment`,
                 { comment: commentText.trim() },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -85,7 +86,7 @@ const IssueDetails = () => {
         setLikeLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.post(`http://localhost:5000/api/issues/${id}/like`, {}, {
+            const response = await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}/like`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -109,7 +110,7 @@ const IssueDetails = () => {
         setActionLoading(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:5000/api/issues/${id}/comment/${commentId}`, {
+            await axios.delete(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}/comment/${commentId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             await fetchIssueDetails();
@@ -131,7 +132,7 @@ const IssueDetails = () => {
         const fetchIssueDetails = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await axios.get(`http://localhost:5000/api/issues/${id}`, {
+                const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setIssue(response.data);
@@ -165,6 +166,18 @@ const IssueDetails = () => {
         </>
     );
 
+    const getDashboardPath = () => {
+        if (currentUser.role === 'officer') return '/officer/dashboard';
+        if (currentUser.role === 'admin') return '/admin/dashboard';
+        return '/dashboard';
+    };
+
+    const getRoleTitle = () => {
+        if (currentUser.role === 'officer') return 'Officer Command Center';
+        if (currentUser.role === 'admin') return 'Administration Portal';
+        return t('civicfix_portal') || 'CivicFix System';
+    };
+
     const formatDate = (dateStr) => {
         if (!dateStr) return '';
         const dateString = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
@@ -172,11 +185,26 @@ const IssueDetails = () => {
     };
 
     return (
-        <>
-            <Navbar />
-            <div className="issue-detail-container">
-                <button className="btn btn-secondary back-btn" onClick={() => navigate('/dashboard')}>
-                    ← {t('back_dashboard', { defaultValue: 'Back to Dashboard' })}
+        <div className="citizen-dashboard">
+            <header className="gov-header">
+                <div className="gov-header-content" style={{ maxWidth: '1000px' }}>
+                    <div className="gov-emblem">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" />
+                            <path d="M2 17L12 22L22 17" />
+                            <path d="M2 12L12 17L22 12" />
+                        </svg>
+                    </div>
+                    <div className="gov-header-title-section">
+                        <h1 className="gov-title">{getRoleTitle()}</h1>
+                        <p className="gov-subtitle">Issue Verification & Details</p>
+                    </div>
+                </div>
+            </header>
+
+            <div className="issue-detail-container" style={{ maxWidth: '1000px', margin: '0 auto', paddingTop: '2rem' }}>
+                <button className="btn btn-secondary back-btn" onClick={() => navigate(getDashboardPath())}>
+                    ← Back to Dashboard
                 </button>
 
                 <div className="issue-detail-card">
@@ -355,7 +383,7 @@ const IssueDetails = () => {
                     />
                 )}
             </div>
-        </>
+        </div>
     );
 };
 
@@ -370,7 +398,7 @@ const FeedbackModal = ({ issueId, onClose, onSuccess }) => {
         setSubmitting(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`http://localhost:5000/api/feedback/${issueId}`,
+            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/feedback/${issueId}`,
                 { response, comment, rating },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

@@ -40,7 +40,7 @@ const Navbar = () => {
         const token = localStorage.getItem('token');
         if (token) {
             try {
-                await fetch('http://localhost:5000/api/auth/update-language', {
+                await fetch(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/update-language`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -49,7 +49,7 @@ const Navbar = () => {
                     body: JSON.stringify({ language: newLang })
                 });
                 // Update token in localStorage with new language
-                const response = await fetch('http://localhost:5000/api/auth/update-language', {
+                const response = await fetch(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/update-language`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

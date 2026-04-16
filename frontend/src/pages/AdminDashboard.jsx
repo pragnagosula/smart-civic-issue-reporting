@@ -53,10 +53,10 @@ const AdminDashboard = () => {
             }
 
             const [officersRes, issuesRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/admin/all-officers', {
+                axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/all-officers`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }),
-                axios.get('http://localhost:5000/api/admin/all-issues', {
+                axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/all-issues`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
             ]);
@@ -95,7 +95,7 @@ const AdminDashboard = () => {
     const handleAction = async (id, action) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`http://localhost:5000/api/admin/${action}/${id}`, {}, {
+            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/${action}/${id}`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchDashboardData();
@@ -156,7 +156,7 @@ const AdminDashboard = () => {
                 label: 'Issues by Category',
                 data: Object.values(categoryCounts),
                 backgroundColor: [
-                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
+                    '#1E40AF', '#2563EB', '#60A5FA', '#93C5FD', '#BFDBFE'
                 ],
             },
         ],
@@ -338,7 +338,7 @@ const AdminDashboard = () => {
                             <h2 className="section-title">City-wide Live Map</h2>
                             <p className="section-subtitle">Real-time geospatial view of all reported civic issues</p>
                         </div>
-                        <div style={{ padding: '0', background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #e5e7eb' }}>
+                        <div style={{ padding: '16px', background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #e5e7eb' }}>
                             <IssueMap issues={issues} height="700px" />
                         </div>
                     </section>
@@ -462,15 +462,15 @@ const AdminDashboard = () => {
                             <p className="section-subtitle">Visual insights into reported issues and system performance</p>
                         </div>
                         
-                        <div className="charts-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2rem' }}>
-                            <div className="chart-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-                                <h3 style={{ marginBottom: '1rem', color: '#111827', fontSize: '1.2rem', fontWeight: 'bold' }}>Issues by Locality</h3>
+                        <div className="charts-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '1.5rem' }}>
+                            <div className="chart-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                                <h3 style={{ marginBottom: '1rem', color: '#1E293B', fontSize: '1.125rem', fontWeight: '700' }}>Issues by Locality</h3>
                                 <div style={{ height: '300px' }}>
                                     <Bar data={localityChartData} options={{ maintainAspectRatio: false, responsive: true }} />
                                 </div>
                             </div>
-                            <div className="chart-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-                                <h3 style={{ marginBottom: '1rem', color: '#111827', fontSize: '1.2rem', fontWeight: 'bold' }}>Issues by Category</h3>
+                            <div className="chart-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                                <h3 style={{ marginBottom: '1rem', color: '#1E293B', fontSize: '1.125rem', fontWeight: '700' }}>Issues by Category</h3>
                                 <div style={{ height: '300px', display: 'flex', justifyContent: 'center' }}>
                                     <Pie data={categoryPieData} options={{ maintainAspectRatio: false, responsive: true }} />
                                 </div>
@@ -613,7 +613,7 @@ const IssueModal = ({ issue, officers, onClose }) => {
             setLoadingIssue(true);
             setIssueError(null);
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:5000/api/issues/${issue.id}`, {
+            const res = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${issue.id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setFullIssue(res.data);
@@ -633,7 +633,7 @@ const IssueModal = ({ issue, officers, onClose }) => {
     const handleAssignOfficer = async (officerId) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`http://localhost:5000/api/issues/assign/${issue.id}`,
+            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/assign/${issue.id}`,
                 { officerId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

@@ -2,29 +2,29 @@
 
 /* ===== CSS Variables - Government India Design System ===== */
 :root {
-    /* Government Colors - Based on Indian National Flag & Official Guidelines */
-    --gov-navy: #1a237e;
-    --gov-blue: #1565c0;
-    --gov-saffron: #ff6f00;
-    --gov-green: #2e7d32;
+    /* Government Colors - Official Layout */
+    --gov-navy: #1E40AF;
+    --gov-blue: #2563EB;
+    --gov-saffron: #F97316;
+    --gov-green: #10B981;
     --gov-white: #ffffff;
     
     /* Functional Colors */
-    --primary: #1565c0;
-    --primary-dark: #0d47a1;
-    --primary-light: #42a5f5;
-    --secondary: #455a64;
-    --success: #2e7d32;
-    --warning: #f57c00;
-    --error: #c62828;
-    --info: #0288d1;
+    --primary: #2563EB;
+    --primary-dark: #1E40AF;
+    --primary-light: #60A5FA;
+    --secondary: #64748B;
+    --success: #10B981;
+    --warning: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
     
     /* Neutral Palette */
-    --text-primary: #212121;
-    --text-secondary: #616161;
-    --text-disabled: #9e9e9e;
-    --divider: #e0e0e0;
-    --background: #fafafa;
+    --text-primary: #1E293B;
+    --text-secondary: #64748B;
+    --text-disabled: #94A3B8;
+    --divider: #E5E7EB;
+    --background: #F8FAFC;
     --surface: #ffffff;
     
     /* Shadows - Elevated Design */
@@ -90,13 +90,13 @@ body {
 }
 
 .gov-header-content {
-    max-width: 1600px;
+    max-width: 1200px;
     margin: 0 auto;
-    padding: var(--space-4) var(--space-7);
+    padding: var(--space-4) var(--space-6);
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: var(--space-5);
+    gap: var(--space-4);
 }
 
 .gov-emblem {
@@ -148,9 +148,9 @@ body {
 
 /* ===== MAIN CONTENT CONTAINER ===== */
 .dashboard-container {
-    max-width: 1600px;
+    max-width: 1200px;
     margin: 0 auto;
-    padding: var(--space-8) var(--space-7);
+    padding: var(--space-6) var(--space-6);
 }
 
 /* ===== SECTION STRUCTURE ===== */
@@ -196,22 +196,23 @@ body {
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: var(--space-6);
-    margin-bottom: var(--space-8);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
 }
 
 .stat-card {
     background: var(--surface);
     border: 1px solid var(--divider);
-    border-radius: var(--radius-lg);
-    padding: var(--space-7);
-    box-shadow: var(--shadow-2);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    box-shadow: var(--shadow-1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: var(--space-5);
+    justify-content: space-between;
+    gap: var(--space-4);
 }
 
 .stat-card::before {
@@ -222,18 +223,13 @@ body {
     right: 0;
     height: 4px;
     background: var(--card-color);
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    opacity: 1; /* Always show the accent border for better structure */
 }
 
 .stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-4);
-    border-color: var(--card-color);
-}
-
-.stat-card:hover::before {
-    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-3);
+    background-color: var(--background);
 }
 
 /* Stat Card Variants */
@@ -244,8 +240,8 @@ body {
 .stat-card-info { --card-color: var(--info); }
 
 .stat-icon {
-    width: 64px;
-    height: 64px;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -253,31 +249,31 @@ body {
         rgba(var(--card-color-rgb), 0.1) 0%, 
         rgba(var(--card-color-rgb), 0.05) 100%
     );
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     color: var(--card-color);
 }
 
-.stat-card-primary .stat-icon { background: rgba(21, 101, 192, 0.1); color: var(--primary); }
-.stat-card-success .stat-icon { background: rgba(46, 125, 50, 0.1); color: var(--success); }
-.stat-card-warning .stat-icon { background: rgba(245, 124, 0, 0.1); color: var(--warning); }
-.stat-card-error .stat-icon { background: rgba(198, 40, 40, 0.1); color: var(--error); }
-.stat-card-info .stat-icon { background: rgba(2, 136, 209, 0.1); color: var(--info); }
+.stat-card-primary .stat-icon { background: rgba(37, 99, 235, 0.1); color: var(--primary); }
+.stat-card-success .stat-icon { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+.stat-card-warning .stat-icon { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+.stat-card-error .stat-icon { background: rgba(239, 68, 68, 0.1); color: var(--error); }
+.stat-card-info .stat-icon { background: rgba(59, 130, 246, 0.1); color: var(--info); }
 
 .stat-icon svg {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
 }
 
 .stat-content {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--space-1);
 }
 
 .stat-value {
     font-family: var(--font-heading);
-    font-size: 2.75rem;
-    font-weight: 700;
+    font-size: 2.25rem;
+    font-weight: 800;
     color: var(--text-primary);
     line-height: 1;
 }
@@ -344,8 +340,8 @@ body {
 .data-table-container {
     background: var(--surface);
     border: 1px solid var(--divider);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-2);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
     overflow: hidden;
 }
 
@@ -357,47 +353,49 @@ body {
 }
 
 .data-table thead {
-    background: linear-gradient(135deg, var(--gov-navy) 0%, var(--gov-blue) 100%);
+    background: var(--background);
 }
 
 .data-table th {
-    padding: var(--space-5) var(--space-6);
+    padding: var(--space-4) var(--space-5);
     text-align: left;
     font-family: var(--font-heading);
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.05em;
     font-size: 0.75rem;
-    color: white;
+    color: var(--text-secondary);
     white-space: nowrap;
-    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 2px solid var(--divider);
 }
 
-.data-table th:first-child {
-    border-top-left-radius: var(--radius-lg);
+.data-table th:nth-child(3),
+.data-table td:nth-child(3) {
+    text-align: center;
 }
 
-.data-table th:last-child {
-    border-top-right-radius: var(--radius-lg);
+.data-table th:last-child,
+.data-table td:last-child {
+    text-align: right;
 }
 
 .data-table tbody tr {
-    border-bottom: 1px solid var(--divider);
-    transition: background-color 0.2s ease;
+    transition: background-color 0.15s ease;
 }
 
 .data-table tbody tr:hover {
-    background: rgba(21, 101, 192, 0.03);
+    background: #F1F5F9;
 }
 
-.data-table tbody tr:last-child {
-    border-bottom: none;
+.data-table tbody tr:not(:last-child) {
+    border-bottom: 1px solid var(--divider);
 }
 
 .data-table td {
-    padding: var(--space-5) var(--space-6);
+    padding: var(--space-4) var(--space-5);
     vertical-align: middle;
     color: var(--text-primary);
+    border-bottom: 1px solid var(--divider);
 }
 
 .row-rejected {
@@ -438,12 +436,12 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: var(--space-2) var(--space-4);
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     font-weight: 700;
-    font-size: 0.875rem;
-    min-width: 60px;
-    border: 2px solid currentColor;
+    font-size: 0.813rem;
+    min-width: 50px;
+    border: 1px solid currentColor;
 }
 
 .score-reason {
@@ -1060,34 +1058,38 @@ select.input-field {
 }
 
 .tabs-container {
-    max-width: 1600px;
+    max-width: 1200px;
     margin: 0 auto;
-    padding: 0 var(--space-7);
+    padding: 0 var(--space-6);
     display: flex;
-    gap: var(--space-6);
+    justify-content: space-between;
     overflow-x: auto;
 }
 
 .tab-btn {
+    flex: 1;
     background: transparent;
     border: none;
-    padding: var(--space-5) 0;
+    padding: var(--space-5) var(--space-4);
     font-family: var(--font-heading);
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--text-secondary);
     cursor: pointer;
     position: relative;
     white-space: nowrap;
-    transition: color 0.2s ease;
+    transition: all 0.2s ease;
 }
 
 .tab-btn:hover {
     color: var(--primary);
+    background: rgba(37, 99, 235, 0.03); /* Subtle hover */
 }
 
 .tab-btn.active {
     color: var(--gov-navy);
+    font-weight: 700;
+    background: rgba(30, 64, 175, 0.05); /* Highlight active */
 }
 
 .tab-btn::after {
@@ -1098,9 +1100,8 @@ select.input-field {
     right: 0;
     height: 3px;
     background: var(--gov-saffron);
-    border-radius: 3px 3px 0 0;
     opacity: 0;
-    transform: scaleX(0.8);
+    transform: scaleX(0);
     transition: all 0.2s ease;
 }
 

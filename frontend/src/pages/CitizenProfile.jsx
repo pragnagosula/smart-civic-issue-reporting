@@ -18,7 +18,7 @@ const CitizenProfile = () => {
                     return;
                 }
                 
-                const response = await axios.get('http://localhost:5000/api/analytics/citizen/profile', {
+                const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/analytics/citizen/profile`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setData(response.data);

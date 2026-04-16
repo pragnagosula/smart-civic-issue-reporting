@@ -79,7 +79,7 @@ const OfficerRegister = () => {
 
             setProcessingStage('Processing document with OCR...');
 
-            const response = await axios.post('http://localhost:5000/api/auth/officer-register', data, {
+            const response = await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/officer-register`, data, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 timeout: 60000, // 60 second timeout for OCR processing
                 onUploadProgress: (progressEvent) => {

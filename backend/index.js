@@ -12,7 +12,11 @@ require('./initDb');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    credentials: true
+}));
 app.use(express.json({ limit: '50mb' }));
 
 app.use('/api/auth', authRoutes);

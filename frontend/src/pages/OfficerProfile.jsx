@@ -18,7 +18,7 @@ const OfficerProfile = () => {
                     return;
                 }
 
-                const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/analytics/officer/profile`, {
+                const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/analytics/officer/profile`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setData(response.data);

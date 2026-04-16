@@ -53,10 +53,10 @@ const AdminDashboard = () => {
             }
 
             const [officersRes, issuesRes] = await Promise.all([
-                axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/all-officers`, {
+                axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/all-officers`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }),
-                axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/all-issues`, {
+                axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/all-issues`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
             ]);
@@ -95,7 +95,7 @@ const AdminDashboard = () => {
     const handleAction = async (id, action) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/${action}/${id}`, {}, {
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/${action}/${id}`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchDashboardData();
@@ -613,7 +613,7 @@ const IssueModal = ({ issue, officers, onClose }) => {
             setLoadingIssue(true);
             setIssueError(null);
             const token = localStorage.getItem('token');
-            const res = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${issue.id}`, {
+            const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${issue.id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setFullIssue(res.data);
@@ -633,7 +633,7 @@ const IssueModal = ({ issue, officers, onClose }) => {
     const handleAssignOfficer = async (officerId) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/assign/${issue.id}`,
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/assign/${issue.id}`,
                 { officerId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

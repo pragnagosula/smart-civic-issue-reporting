@@ -31,8 +31,8 @@ const Signup = () => {
         setError('');
 
         try {
-            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/signup`, formData);
-            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/send-otp`, { email: formData.email });
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/signup`, formData);
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/send-otp`, { email: formData.email });
             navigate('/verify-otp', { state: { email: formData.email, isSignup: true } });
         } catch (err) {
             setError(err.response?.data?.message || 'Something went wrong');

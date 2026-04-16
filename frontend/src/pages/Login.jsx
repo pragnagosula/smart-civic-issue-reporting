@@ -34,7 +34,7 @@ const Login = () => {
 
         try {
             if (isAdmin) {
-                const res = await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/admin-login`, {
+                const res = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/admin-login`, {
                     email,
                     password
                 });
@@ -46,7 +46,7 @@ const Login = () => {
                 }
                 navigate('/admin/dashboard');
             } else {
-                await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/login`, { email });
+                await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/login`, { email });
                 navigate('/verify-otp', { state: { email, isSignup: false } });
             }
         } catch (err) {

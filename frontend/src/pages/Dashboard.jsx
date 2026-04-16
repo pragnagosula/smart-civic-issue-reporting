@@ -63,7 +63,7 @@ const Dashboard = () => {
     const fetchIssues = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/my-issues`, {
+            const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/my-issues`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const issuesData = response.data;
@@ -100,7 +100,7 @@ const Dashboard = () => {
             if (activeFilters.search) params.append('search', activeFilters.search);
             if (activeFilters.status) params.append('status', activeFilters.status);
             if (activeFilters.category) params.append('category', activeFilters.category);
-            const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/all?${params.toString()}`, {
+            const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/all?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setAllIssues(response.data);

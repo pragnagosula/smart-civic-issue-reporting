@@ -13,7 +13,7 @@ const DepartmentAnalytics = () => {
         const fetchAnalytics = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/analytics/admin/department-analytics`, {
+                const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/analytics/admin/department-analytics`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setData(response.data);

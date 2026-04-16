@@ -41,7 +41,7 @@ const IssueDetails = () => {
     const fetchIssueDetails = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}`, {
+            const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const issueData = response.data;
@@ -68,7 +68,7 @@ const IssueDetails = () => {
         setActionLoading(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}/comment`,
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}/comment`,
                 { comment: commentText.trim() },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -86,7 +86,7 @@ const IssueDetails = () => {
         setLikeLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}/like`, {}, {
+            const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}/like`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -110,7 +110,7 @@ const IssueDetails = () => {
         setActionLoading(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}/comment/${commentId}`, {
+            await axios.delete(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}/comment/${commentId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             await fetchIssueDetails();
@@ -132,7 +132,7 @@ const IssueDetails = () => {
         const fetchIssueDetails = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}`, {
+                const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/${id}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setIssue(response.data);
@@ -398,7 +398,7 @@ const FeedbackModal = ({ issueId, onClose, onSuccess }) => {
         setSubmitting(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.post(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/feedback/${issueId}`,
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/feedback/${issueId}`,
                 { response, comment, rating },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

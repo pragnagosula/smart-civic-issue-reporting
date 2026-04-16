@@ -34,7 +34,7 @@ const OfficerDashboard = () => {
                 navigate('/login');
                 return;
             }
-            const res = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/officer/my-department-issues`, {
+            const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/officer/my-department-issues`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setIssues(res.data);
@@ -102,7 +102,7 @@ const OfficerDashboard = () => {
         try {
             const token = localStorage.getItem('token');
             const payload = { status: newStatus, ...extraData };
-            await axios.patch(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/officer/issue/${id}/status`,
+            await axios.patch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/officer/issue/${id}/status`,
                 payload,
                 { headers: { Authorization: `Bearer ${token}` } }
             );

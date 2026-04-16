@@ -13,7 +13,7 @@ const CivicHealthDashboard = () => {
         const fetchHealth = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await axios.get(${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/analytics/admin/civic-health`, {
+                const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/analytics/admin/civic-health`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setData(response.data);

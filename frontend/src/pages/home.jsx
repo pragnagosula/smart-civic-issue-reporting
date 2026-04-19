@@ -60,8 +60,8 @@ const Home = () => {
                             <span>Digital India Initiative</span>
                         </div>
                         <h1 className="hero-title">
-                            Building Better Cities<br />
-                            <span className="hero-highlight">Together</span>
+                            Building Better<br />
+                            Cities <span className="hero-highlight">Together</span>
                         </h1>
                         <p className="hero-subtitle">
                             Empowering citizens to report civic issues and track their resolution in real-time. 

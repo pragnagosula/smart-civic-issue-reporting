@@ -340,7 +340,7 @@ const CitizenProfile = () => {
                     </h3>
                     
                     {!recentActivity || recentActivity.length === 0 ? (
-                        <div className="gamified-empty-state">
+                        <div className="gamified-empty-state gamified-card">
                             <div className="empty-state-emoji"><RocketLaunchRoundedIcon sx={{ fontSize: 60, color: 'var(--primary-color)' }} /></div>
                             <h3>Start Your Journey</h3>
                             <p>No activity yet. Report your first issue to see your timeline build out.</p>

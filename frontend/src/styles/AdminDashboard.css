@@ -451,18 +451,327 @@ body {
     max-width: 300px;
 }
 
-/* ===== BADGES ===== */
-.badge {
-    display: inline-flex;
+/* ===== ISSUES MANAGEMENT ENHANCED CONTROLS ===== */
+.issues-controls {
+    background: var(--surface);
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-6);
+    box-shadow: var(--shadow-1);
+}
+
+.search-filter-row {
+    display: flex;
+    gap: var(--space-4);
     align-items: center;
+    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.search-input-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 300px;
+}
+
+.search-icon {
+    position: absolute;
+    left: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    z-index: 1;
+}
+
+.search-input {
+    width: 100%;
+    padding: var(--space-3) var(--space-3) var(--space-3) var(--space-8);
+    border: 2px solid var(--divider);
+    border-radius: var(--radius-md);
+    font-size: 0.938rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    background: var(--surface);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.filter-row {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-secondary);
+}
+
+.filter-select {
     padding: var(--space-2) var(--space-4);
-    border-radius: 20px;
+    border: 2px solid var(--divider);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.results-info {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-top: var(--space-3);
+}
+
+.filter-active {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* ===== ENHANCED TABLE STYLES ===== */
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.sortable-header:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.issue-row {
+    transition: background-color 0.2s ease;
+}
+
+.issue-row:hover {
+    background: rgba(241, 245, 249, 0.8);
+}
+
+/* Category Cell */
+.category-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.category-icon {
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+}
+
+/* Description Cell */
+.description-content {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help;
+}
+
+/* Status Cell */
+.status-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.status-icon {
+    color: var(--text-secondary);
+}
+
+/* Confidence Cell */
+.confidence-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.confidence-bar {
+    width: 60px;
+    height: 6px;
+    background: var(--divider);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--error) 0%, var(--warning) 50%, var(--success) 100%);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.confidence-text {
     font-size: 0.75rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border: 1px solid currentColor;
+    color: var(--text-primary);
+}
+
+/* Location Cell */
+.location-cell {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    max-width: 200px;
+}
+
+.location-cell svg {
+    color: var(--text-secondary);
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.location-cell span {
+    font-size: 0.875rem;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+/* Date Cell */
+.date-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.date-cell svg {
+    color: var(--text-secondary);
+}
+
+.date-cell span {
+    font-size: 0.875rem;
     white-space: nowrap;
+}
+
+/* ===== PAGINATION ===== */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-6);
+    padding: var(--space-4);
+}
+
+.pagination-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--divider);
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pagination-info {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0 var(--space-4);
+    white-space: nowrap;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 1024px) {
+    .search-filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .search-input-wrapper {
+        min-width: auto;
+    }
+
+    .filter-row {
+        justify-content: center;
+    }
+
+    .data-table {
+        font-size: 0.875rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: var(--space-3);
+    }
+
+    .description-content {
+        max-width: 200px;
+    }
+
+    .location-cell {
+        max-width: 150px;
+    }
+}
+
+@media (max-width: 768px) {
+    .issues-controls {
+        padding: var(--space-4);
+    }
+
+    .search-filter-row {
+        gap: var(--space-3);
+    }
+
+    .filter-row {
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+
+    .data-table-container {
+        overflow-x: auto;
+    }
+
+    .data-table {
+        min-width: 800px;
+    }
+
+    .pagination {
+        flex-wrap: wrap;
+        gap: var(--space-1);
+    }
+
+    .pagination-info {
+        order: 1;
+        width: 100%;
+        text-align: center;
+        margin: var(--space-2) 0;
+    }
 }
 
 .badge-department {

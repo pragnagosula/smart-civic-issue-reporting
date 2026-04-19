@@ -14,6 +14,33 @@ import {
 import { Bar, Pie } from 'react-chartjs-2';
 import IssueMap from '../components/IssueMap';
 import '../styles/AdminDashboard.css';
+import {
+    Search as SearchIcon,
+    FilterList as FilterIcon,
+    Sort as SortIcon,
+    KeyboardArrowUp as ArrowUpIcon,
+    KeyboardArrowDown as ArrowDownIcon,
+    LocationOn as LocationIcon,
+    Person as PersonIcon,
+    Schedule as ScheduleIcon,
+    CheckCircle as ResolvedIcon,
+    Error as EscalatedIcon,
+    Build as InProgressIcon,
+    Report as ReportedIcon,
+    Lightbulb as StreetlightIcon,
+    WaterDrop as WaterIcon,
+    Error as RoadIcon,
+    Delete as GarbageIcon,
+    CleaningServices as SanitationIcon,
+    Waves as DrainageIcon,
+    NaturePeople as ParksIcon,
+    Recycling as WasteIcon,
+    MyLocation as OtherIcon,
+    ChevronLeft as ChevronLeftIcon,
+    ChevronRight as ChevronRightIcon,
+    FirstPage as FirstPageIcon,
+    LastPage as LastPageIcon
+} from '@mui/icons-material';
 
 ChartJS.register(
   CategoryScale,
@@ -569,6 +596,112 @@ const EscalatedIssuesTable = ({ issues, officers, onSelectIssue }) => {
 
 // All Issues Table Component
 const IssuesTable = ({ issues, officers, onSelectIssue }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
+    const [sortField, setSortField] = useState('timestamp');
+    const [sortDirection, setSortDirection] = useState('desc');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10);
+
+    // Category icons mapping
+    const getCategoryIcon = (category) => {
+        const iconMap = {
+            'Roads': <RoadIcon fontSize="small" />,
+            'Water': <WaterIcon fontSize="small" />,
+            'Sanitation': <SanitationIcon fontSize="small" />,
+            'Streetlight': <StreetlightIcon fontSize="small" />,
+            'Drainage': <DrainageIcon fontSize="small" />,
+            'Parks': <ParksIcon fontSize="small" />,
+            'Waste': <WasteIcon fontSize="small" />,
+            'Other': <OtherIcon fontSize="small" />
+        };
+        return iconMap[category] || <OtherIcon fontSize="small" />;
+    };
+
+    // Status icons mapping
+    const getStatusIcon = (status) => {
+        const iconMap = {
+            'Reported': <ReportedIcon fontSize="small" />,
+            'Assigned': <PersonIcon fontSize="small" />,
+            'In Progress': <InProgressIcon fontSize="small" />,
+            'Resolved': <ResolvedIcon fontSize="small" />,
+            'Escalated': <EscalatedIcon fontSize="small" />,
+            'Flagged': <EscalatedIcon fontSize="small" />
+        };
+        return iconMap[status] || <ReportedIcon fontSize="small" />;
+    };
+
+    // Filter and sort issues
+    const filteredAndSortedIssues = issues
+        .filter(issue => {
+            const matchesSearch = !searchTerm ||
+                getLocalizedDescription(issue).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                issue.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (issue.address && issue.address.toLowerCase().includes(searchTerm.toLowerCase()));
+
+            const matchesStatus = !statusFilter || issue.status === statusFilter;
+            const matchesCategory = !categoryFilter || issue.category === categoryFilter;
+
+            return matchesSearch && matchesStatus && matchesCategory;
+        })
+        .sort((a, b) => {
+            let aValue, bValue;
+
+            switch (sortField) {
+                case 'category':
+                    aValue = a.category;
+                    bValue = b.category;
+                    break;
+                case 'status':
+                    aValue = a.status;
+                    bValue = b.status;
+                    break;
+                case 'ai_confidence':
+                    aValue = a.ai_confidence;
+                    bValue = b.ai_confidence;
+                    break;
+                case 'timestamp':
+                default:
+                    aValue = new Date(a.timestamp || a.created_at);
+                    bValue = new Date(b.timestamp || b.created_at);
+                    break;
+            }
+
+            if (sortDirection === 'asc') {
+                return aValue > bValue ? 1 : -1;
+            } else {
+                return aValue < bValue ? 1 : -1;
+            }
+        });
+
+    // Pagination
+    const totalPages = Math.ceil(filteredAndSortedIssues.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedIssues = filteredAndSortedIssues.slice(startIndex, startIndex + itemsPerPage);
+
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
+    const getSortIcon = (field) => {
+        if (sortField !== field) return <SortIcon fontSize="small" style={{ opacity: 0.3 }} />;
+        return sortDirection === 'asc' ?
+            <ArrowUpIcon fontSize="small" /> :
+            <ArrowDownIcon fontSize="small" />;
+    };
+
+    const resetFilters = () => {
+        setSearchTerm('');
+        setStatusFilter('');
+        setCategoryFilter('');
+        setCurrentPage(1);
+    };
 
     if (!issues || issues.length === 0) {
         return (
@@ -584,39 +717,155 @@ const IssuesTable = ({ issues, officers, onSelectIssue }) => {
 
     return (
         <>
+            {/* Enhanced Filters and Search */}
+            <div className="issues-controls">
+                <div className="search-filter-row">
+                    <div className="search-input-wrapper">
+                        <SearchIcon className="search-icon" />
+                        <input
+                            type="text"
+                            placeholder="Search issues by description, category, or location..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="search-input"
+                        />
+                    </div>
+
+                    <div className="filter-row">
+                        <div className="filter-group">
+                            <FilterIcon fontSize="small" />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="filter-select"
+                            >
+                                <option value="">All Statuses</option>
+                                <option value="Reported">Reported</option>
+                                <option value="Assigned">Assigned</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Resolved">Resolved</option>
+                                <option value="Escalated">Escalated</option>
+                                <option value="Flagged">Flagged</option>
+                            </select>
+                        </div>
+
+                        <div className="filter-group">
+                            <FilterIcon fontSize="small" />
+                            <select
+                                value={categoryFilter}
+                                onChange={(e) => setCategoryFilter(e.target.value)}
+                                className="filter-select"
+                            >
+                                <option value="">All Categories</option>
+                                <option value="Roads">Roads</option>
+                                <option value="Water">Water</option>
+                                <option value="Sanitation">Sanitation</option>
+                                <option value="Streetlight">Streetlight</option>
+                                <option value="Drainage">Drainage</option>
+                                <option value="Parks">Parks</option>
+                                <option value="Waste">Waste</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <button onClick={resetFilters} className="btn btn-sm btn-secondary">
+                            Clear Filters
+                        </button>
+                    </div>
+                </div>
+
+                <div className="results-info">
+                    Showing {paginatedIssues.length} of {filteredAndSortedIssues.length} issues
+                    {(searchTerm || statusFilter || categoryFilter) && (
+                        <span className="filter-active"> (filtered)</span>
+                    )}
+                </div>
+            </div>
+
+            {/* Enhanced Data Table */}
             <div className="data-table-container">
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th scope="col">Category</th>
+                            <th scope="col" onClick={() => handleSort('category')} className="sortable-header">
+                                <div className="header-content">
+                                    Category {getSortIcon('category')}
+                                </div>
+                            </th>
                             <th scope="col">Description</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">AI Confidence</th>
-                            <th scope="col">Reported</th>
+                            <th scope="col" onClick={() => handleSort('status')} className="sortable-header">
+                                <div className="header-content">
+                                    Status {getSortIcon('status')}
+                                </div>
+                            </th>
+                            <th scope="col" onClick={() => handleSort('ai_confidence')} className="sortable-header">
+                                <div className="header-content">
+                                    AI Confidence {getSortIcon('ai_confidence')}
+                                </div>
+                            </th>
+                            <th scope="col">Location</th>
+                            <th scope="col" onClick={() => handleSort('timestamp')} className="sortable-header">
+                                <div className="header-content">
+                                    Reported {getSortIcon('timestamp')}
+                                </div>
+                            </th>
                             <th scope="col">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {issues.map(issue => (
-                            <tr key={issue.id}>
-                                <td><span className="badge badge-info">{issue.category}</span></td>
-                                <td className="description-cell">
-                                    {String(getLocalizedDescription(issue)).substring(0, 100)}
-                                    {String(getLocalizedDescription(issue)).length > 100 && '...'}
-                                </td>
+                        {paginatedIssues.map(issue => (
+                            <tr key={issue.id} className="issue-row">
                                 <td>
-                                    <span className={`status-badge status-${issue.status?.toLowerCase().replace(' ', '-') || 'reported'}`}>
-                                        {issue.status || 'Reported'}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div className="confidence-score">
-                                        {(issue.ai_confidence * 100).toFixed(0)}%
+                                    <div className="category-cell">
+                                        <span className="category-icon">
+                                            {getCategoryIcon(issue.category)}
+                                        </span>
+                                        <span className="badge badge-info">{issue.category}</span>
                                     </div>
                                 </td>
-                                <td>{new Date(issue.timestamp || issue.created_at).toLocaleDateString('en-IN')}</td>
+                                <td className="description-cell">
+                                    <div className="description-content" title={getLocalizedDescription(issue)}>
+                                        {String(getLocalizedDescription(issue)).substring(0, 120)}
+                                        {String(getLocalizedDescription(issue)).length > 120 && '...'}
+                                    </div>
+                                </td>
                                 <td>
-                                    <button 
+                                    <div className="status-cell">
+                                        <span className="status-icon">
+                                            {getStatusIcon(issue.status)}
+                                        </span>
+                                        <span className={`status-badge status-${issue.status?.toLowerCase().replace(' ', '-') || 'reported'}`}>
+                                            {issue.status || 'Reported'}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="confidence-cell">
+                                        <div className="confidence-bar">
+                                            <div
+                                                className="confidence-fill"
+                                                style={{ width: `${issue.ai_confidence * 100}%` }}
+                                            ></div>
+                                        </div>
+                                        <span className="confidence-text">
+                                            {(issue.ai_confidence * 100).toFixed(0)}%
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="location-cell">
+                                        <LocationIcon fontSize="small" />
+                                        <span>{issue.address || 'Location not specified'}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="date-cell">
+                                        <ScheduleIcon fontSize="small" />
+                                        <span>{new Date(issue.timestamp || issue.created_at).toLocaleDateString('en-IN')}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <button
                                         onClick={() => onSelectIssue(issue)}
                                         className="btn btn-sm btn-primary"
                                     >
@@ -628,6 +877,45 @@ const IssuesTable = ({ issues, officers, onSelectIssue }) => {
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="pagination">
+                    <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="pagination-btn"
+                    >
+                        <FirstPageIcon />
+                    </button>
+                    <button
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="pagination-btn"
+                    >
+                        <ChevronLeftIcon />
+                    </button>
+
+                    <span className="pagination-info">
+                        Page {currentPage} of {totalPages}
+                    </span>
+
+                    <button
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="pagination-btn"
+                    >
+                        <ChevronRightIcon />
+                    </button>
+                    <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="pagination-btn"
+                    >
+                        <LastPageIcon />
+                    </button>
+                </div>
+            )}
         </>
     );
 };

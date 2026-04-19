@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import jwtDecode from 'jwt-decode'; // npm install jwt-decode
 import { useTranslation } from 'react-i18next';
 import './Navbar.css';
+import AccountBalanceRoundedIcon from '@mui/icons-material/AccountBalanceRounded';
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -75,8 +76,8 @@ const Navbar = () => {
         <nav className="navbar">
             <div className="navbar-container">
                 <div className="navbar-brand">
-                    <Link to={dashboardLink} className="brand-link">
-                        🏛️ {t('civicfix_portal')}
+                    <Link to={dashboardLink} className="brand-link" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <AccountBalanceRoundedIcon style={{ fontSize: '24px' }} /> {t('civicfix_portal')}
                     </Link>
                 </div>
                 <ul className="navbar-menu">

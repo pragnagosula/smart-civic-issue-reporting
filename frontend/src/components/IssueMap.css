@@ -1,9 +1,11 @@
 .issue-map-container {
-  width: 100%;
+  width: 100% !important;
+  min-height: 400px;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   border: 1px solid rgba(0, 0, 0, 0.05);
+  background-color: #f1f5f9;
 }
 
 .map-popup-card {

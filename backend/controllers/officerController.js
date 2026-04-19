@@ -417,12 +417,28 @@ const updateIssueStatus = async (req, res) => {
             res.json({ message: "Issue resolved with proof", issue: result[0] });
 
         } else {
-            const result = await sql`
-                UPDATE issues
-                SET status = ${status}, updated_at = NOW(), assigned_officer_id = ${req.user.id}
-                WHERE id = ${id}
-                RETURNING *
-            `;
+            let updateQuery;
+            if (status === 'In Progress') {
+                updateQuery = sql`
+                    UPDATE issues
+                    SET status = ${status}, 
+                        updated_at = NOW(), 
+                        assigned_officer_id = ${req.user.id},
+                        in_progress_at = COALESCE(in_progress_at, NOW()),
+                        acknowledged_at = COALESCE(acknowledged_at, NOW())
+                    WHERE id = ${id}
+                    RETURNING *
+                `;
+            } else {
+                updateQuery = sql`
+                    UPDATE issues
+                    SET status = ${status}, updated_at = NOW(), assigned_officer_id = ${req.user.id}
+                    WHERE id = ${id}
+                    RETURNING *
+                `;
+            }
+
+            const result = await updateQuery;
             if (result.length === 0) return res.status(404).json({ message: "Issue not found" });
 
             if (citizenId) {

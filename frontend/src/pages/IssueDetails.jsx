@@ -4,6 +4,15 @@ import axios from 'axios';
 import jwtDecode from 'jwt-decode';
 import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
+import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
+import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
+import QuestionAnswerRoundedIcon from '@mui/icons-material/QuestionAnswerRounded';
+import StarRoundedIcon from '@mui/icons-material/StarRounded';
+import EventRoundedIcon from '@mui/icons-material/EventRounded';
+import LocationOnRoundedIcon from '@mui/icons-material/LocationOnRounded';
+import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded';
 import '../styles/Dashboard.css'; // Inherit gov styles
 import '../styles/IssueDetails.css';
 
@@ -150,19 +159,32 @@ const IssueDetails = () => {
     if (loading) return (
         <>
             <Navbar />
-            <div className="issue-loading">Loading details...</div>
+            <div className="issue-loading-state">
+                <div className="loading-spinner"></div>
+                <p>Loading issue details...</p>
+            </div>
         </>
     );
     if (error) return (
         <>
             <Navbar />
-            <div className="issue-error">{error}</div>
+            <div className="issue-error-state">
+                <div className="error-icon">
+                    <WarningAmberRoundedIcon />
+                </div>
+                <p>{error}</p>
+            </div>
         </>
     );
     if (!issue) return (
         <>
             <Navbar />
-            <div className="issue-error">Issue not found.</div>
+            <div className="issue-error-state">
+                <div className="error-icon">
+                    <WarningAmberRoundedIcon />
+                </div>
+                <p>Issue not found.</p>
+            </div>
         </>
     );
 
@@ -185,9 +207,9 @@ const IssueDetails = () => {
     };
 
     return (
-        <div className="citizen-dashboard">
+        <div className="issue-detail-page">
             <header className="gov-header">
-                <div className="gov-header-content" style={{ maxWidth: '1000px' }}>
+                <div className="gov-header-content">
                     <div className="gov-emblem">
                         <svg viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2L2 7L12 12L22 7L12 2Z" />
@@ -197,62 +219,109 @@ const IssueDetails = () => {
                     </div>
                     <div className="gov-header-title-section">
                         <h1 className="gov-title">{getRoleTitle()}</h1>
-                        <p className="gov-subtitle">Issue Verification & Details</p>
+                        <p className="gov-subtitle">Issue Investigation & Resolution Tracking</p>
+                    </div>
+                    <div className="gov-header-actions">
+                        <button className="btn-back" onClick={() => navigate(getDashboardPath())}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M19 12H5M12 19l-7-7 7-7" />
+                            </svg>
+                            Back
+                        </button>
                     </div>
                 </div>
             </header>
 
-            <div className="issue-detail-container" style={{ maxWidth: '1000px', margin: '0 auto', paddingTop: '2rem' }}>
-                <button className="btn btn-secondary back-btn" onClick={() => navigate(getDashboardPath())}>
-                    ← Back to Dashboard
-                </button>
-
-                <div className="issue-detail-card">
+            <main className="issue-detail-main">
+                <div className="issue-detail-container">
                     <div className="issue-detail-header">
-                        <h1 className="issue-detail-title">
-                            {t('cat_' + (issue.category === 'Street Lighting' ? 'lighting' : issue.category === 'Water Supply' ? 'water' : issue.category.toLowerCase()), { defaultValue: issue.category })}
-                        </h1>
-                        <span className={`status-badge status-${(issue.status || 'reported').toLowerCase().replace(' ', '-')}`}>
+                        <div className="header-left">
+                            <h1 className="issue-title">
+                                Issue #{issue.id}
+                            </h1>
+                            <p className="issue-category-badge">
+                                {t('cat_' + (issue.category === 'Street Lighting' ? 'lighting' : issue.category === 'Water Supply' ? 'water' : issue.category.toLowerCase()), { defaultValue: issue.category })}
+                            </p>
+                        </div>
+                        <span className={`status-badge-large status-${(issue.status || 'reported').toLowerCase().replace(' ', '-')}`}>
                             {t('status_' + (issue.status || 'Reported').toLowerCase().replace(' ', ''), { defaultValue: issue.status })}
                         </span>
                     </div>
 
-                    <div className="issue-image-container">
-                        <img src={issue.image} alt="Issue Evidence" className="issue-image" />
+                    <div className="issue-image-showcase">
+                        {issue.image && <img src={issue.image} alt="Issue Evidence" className="issue-image" />}
                     </div>
 
                     {issue.ai_status && (
-                        <div className="ai-analysis-card">
-                            <div className="ai-analysis-header">
-                                <span className={`ai-badge ai-${issue.ai_status.toLowerCase()}`}>
-                                    {issue.ai_status === 'Verified' ? '✅ Verified Issue' : '⚠️ Flagged for Review'}
-                                </span>
-                                <span className="ai-confidence">Confidence: {issue.ai_confidence ? (issue.ai_confidence * 100).toFixed(1) : 0}%</span>
+                        <div className={`ai-analysis-section ai-status-${issue.ai_status.toLowerCase()}`}>
+                            <div className="ai-header">
+                                <div className="ai-badge-wrapper">
+                                    {issue.ai_status === 'Verified' ? (
+                                        <>
+                                            <CheckCircleRoundedIcon className="ai-icon verified" />
+                                            <div>
+                                                <div className="ai-status">✓ Verified Issue</div>
+                                                <div className="ai-confidence">Confidence: {issue.ai_confidence ? (issue.ai_confidence * 100).toFixed(1) : 0}%</div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <WarningAmberRoundedIcon className="ai-icon flagged" />
+                                            <div>
+                                                <div className="ai-status">⚠ Flagged for Review</div>
+                                                <div className="ai-confidence">Confidence: {issue.ai_confidence ? (issue.ai_confidence * 100).toFixed(1) : 0}%</div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                            <p className="ai-reason">"{issue.ai_reason}"</p>
+                            {issue.ai_reason && (
+                                <div className="ai-reason-box">
+                                    <p className="ai-reason-label">AI Analysis</p>
+                                    <p className="ai-reason-text">"{issue.ai_reason}"</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
-                    <div className="issue-description-box">
-                        <h3 className="info-label">{t('description_voice', { defaultValue: 'DESCRIPTION (Voice Input)' })}</h3>
-                        <p className="issue-description-text">{getLocalizedDescription(issue)}</p>
+                    <div className="issue-description-section">
+                        <h2 className="section-title">Issue Description</h2>
+                        <div className="description-content">
+                            <p>{getLocalizedDescription(issue)}</p>
+                        </div>
                     </div>
 
-                    <div className="issue-meta-grid">
-                        <div className="meta-item">
-                            <span className="meta-label">{t('reported_on', { defaultValue: 'REPORTED ON' })}</span>
-                            <span className="meta-value">{formatDate(issue.timestamp)}</span>
-                        </div>
-                        <div className="meta-item">
-                            <span className="meta-label">{t('location', { defaultValue: 'LOCATION' })}</span>
-                            <a
-                                href={`https://www.google.com/maps/search/?api=1&query=${issue.latitude},${issue.longitude}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="location-link"
-                            >
-                                {Number(issue.latitude).toFixed(6)}, {Number(issue.longitude).toFixed(6)} ↗
-                            </a>
+                    <div className="issue-meta-section">
+                        <div className="meta-grid">
+                            <div className="meta-card">
+                                <div className="meta-icon"><EventRoundedIcon /></div>
+                                <div className="meta-content">
+                                    <div className="meta-label">{t('reported_on', { defaultValue: 'Reported On' })}</div>
+                                    <div className="meta-value">{formatDate(issue.timestamp)}</div>
+                                </div>
+                            </div>
+                            <div className="meta-card">
+                                <div className="meta-icon"><LocationOnRoundedIcon /></div>
+                                <div className="meta-content">
+                                    <div className="meta-label">{t('location', { defaultValue: 'Location' })}</div>
+                                    <a
+                                        href={`https://www.google.com/maps/search/?api=1&query=${issue.latitude},${issue.longitude}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="location-link"
+                                    >
+                                        View on Map ↗
+                                    </a>
+                                    <div className="coordinates">{Number(issue.latitude).toFixed(4)}, {Number(issue.longitude).toFixed(4)}</div>
+                                </div>
+                            </div>
+                            <div className="meta-card">
+                                <div className="meta-icon"><LocalOfferRoundedIcon /></div>
+                                <div className="meta-content">
+                                    <div className="meta-label">Category</div>
+                                    <div className="meta-value">{issue.category}</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -262,14 +331,15 @@ const IssueDetails = () => {
                                 <span className="activity-title">Likes & Comments</span>
                                 <span className="activity-subtitle">Track community responses for this issue</span>
                             </div>
-                            <button
-                                type="button"
-                                className={`like-button ${userLiked ? 'liked' : ''}`}
-                                onClick={handleToggleLike}
-                                disabled={likeLoading || !canComment}
-                            >
-                                {userLiked ? '💚 Liked' : '🤍 Like'} ({likes})
-                            </button>
+                                <button
+                                    type="button"
+                                    className={`like-button ${userLiked ? 'liked' : ''}`}
+                                    onClick={handleToggleLike}
+                                    disabled={likeLoading || !canComment}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    {userLiked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />} ({likes})
+                                </button>
                         </div>
 
                         {canComment && (
@@ -326,7 +396,9 @@ const IssueDetails = () => {
                     {/* RESOLUTION PROOF SECTION */}
                     {(issue.status === 'Resolved' || issue.status === 'Closed') && (
                         <div className="resolution-section">
-                            <h2 className="resolution-title">✅ Resolution Proof</h2>
+                            <h2 className="resolution-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <CheckCircleRoundedIcon style={{ color: 'var(--success-color)' }} /> Resolution Proof
+                            </h2>
                             <div className="resolution-card">
                                 <div className="resolution-grid">
                                     <div className="resolution-meta">
@@ -382,7 +454,7 @@ const IssueDetails = () => {
                         }}
                     />
                 )}
-            </div>
+            </main>
         </div>
     );
 };
@@ -414,7 +486,9 @@ const FeedbackModal = ({ issueId, onClose, onSuccess }) => {
     return (
         <div className="modal-overlay">
             <div className="modal-card">
-                <h3 className="modal-title">💬 Verify Resolution</h3>
+                <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center' }}>
+                    <QuestionAnswerRoundedIcon color="primary" /> Verify Resolution
+                </h3>
                 <p className="modal-subtitle">Based on the proof provided, is the issue resolved?</p>
 
                 <div className="modal-response-btns">
@@ -442,7 +516,7 @@ const FeedbackModal = ({ issueId, onClose, onSuccess }) => {
                                     onClick={() => setRating(star)}
                                     className={`star ${star <= rating ? 'star-filled' : ''}`}
                                 >
-                                    ★
+                                    <StarRoundedIcon fontSize="inherit" />
                                 </span>
                             ))}
                         </div>

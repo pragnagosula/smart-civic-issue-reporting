@@ -7,7 +7,7 @@ const SelectRole = () => {
 
     return (
         <div className="auth-container">
-            <div className="card" style={{ maxWidth: '850px', margin: '0 auto', overflow: 'visible', borderRadius: '24px', padding: '4rem 3rem', background: '#FFFFFF', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.05)' }}>
+            <div className="card" style={{ maxWidth: '850px', margin: '0 auto', overflow: 'visible', borderRadius: '28px', padding: '4rem 3rem', background: '#FFFFFF', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.05)', border: '1px solid #f1f5f9' }}>
                 <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)', borderRadius: '18px', marginBottom: '1.5rem', boxShadow: '0 10px 25px rgba(59, 130, 246, 0.3)' }}>
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '32px', height: '32px', color: '#FFFFFF' }}>
@@ -24,33 +24,35 @@ const SelectRole = () => {
                     <div 
                         className="role-selection-card" 
                         onClick={() => navigate('/citizen-signup')}
+                        style={{ borderRadius: '28px', border: '1.5px solid #f1f5f9', background: '#fff', padding: '2.5rem', transition: 'all 0.4s ease', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}
                     >
-                        <div className="role-icon-container" style={{ background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', color: '#3B82F6' }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <div className="role-icon-container" style={{ background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', color: '#3B82F6', width: '64px', height: '64px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '30px', height: '30px' }}>
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                                 <circle cx="9" cy="7" r="4" />
                                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                             </svg>
                         </div>
-                        <h3>Citizen</h3>
-                        <p>Register as a resident to report issues, track resolutions, and engage with community updates.</p>
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#111827', marginBottom: '0.75rem' }}>Citizen</h3>
+                        <p style={{ color: '#64748b', fontSize: '0.95rem', lineHeight: 1.6 }}>Register as a resident to report issues, track resolutions, and engage with community updates.</p>
                     </div>
 
                     {/* Officer Card */}
                     <div 
                         className="role-selection-card" 
                         onClick={() => navigate('/officer/register')}
+                        style={{ borderRadius: '28px', border: '1.5px solid #f1f5f9', background: '#fff', padding: '2.5rem', transition: 'all 0.4s ease', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}
                     >
-                        <div className="role-icon-container" style={{ background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', color: '#10B981' }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <div className="role-icon-container" style={{ background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', color: '#10B981', width: '64px', height: '64px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '30px', height: '30px' }}>
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                                 <path d="M12 8v4" />
                                 <path d="M12 16h.01" />
                             </svg>
                         </div>
-                        <h3>Officer</h3>
-                        <p>Register as a government official to manage tasks, review verification, and coordinate infrastructure fixes.</p>
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#111827', marginBottom: '0.75rem' }}>Officer</h3>
+                        <p style={{ color: '#64748b', fontSize: '0.95rem', lineHeight: 1.6 }}>Register as a government official to manage tasks, review verification, and coordinate infrastructure fixes.</p>
                     </div>
                 </div>
 

@@ -1,18 +1,41 @@
 const sql = require('../db');
 
-// SLA Configuration (in Hours) - For demo purposes, maybe check minutes or use hours
+// Multi-Level SLA Configuration (in Hours)
 const SLA_CONFIG = {
-    'Sanitation': 24,
-    'Roads': 48,
-    'Water Supply': 24,
-    'Electricity': 12,
-    'Default': 48
+    'Acknowledgment': {
+        'electricity': 4,
+        'streetlight': 4,
+        'sanitation': 6,
+        'water': 6,
+        'water supply': 6,
+        'roads': 12,
+        'default': 12
+    },
+    'Action': {
+        'electricity': 24,
+        'streetlight': 24,
+        'sanitation': 36,
+        'water': 36,
+        'water supply': 36,
+        'roads': 72,
+        'default': 72
+    },
+    'Resolution': {
+        'electricity': 48,
+        'streetlight': 48,
+        'sanitation': 72,
+        'water': 72,
+        'water supply': 72,
+        'roads': 168, // 7 days = 168 hrs
+        'default': 168
+    }
 };
 
-// Helper: Get SLA limit in Postgres Interval string
-const getSLAInterval = (category) => {
-    const hours = SLA_CONFIG[category] || SLA_CONFIG['Default'];
-    return `${hours} hours`;
+// Helper: Get SLA limit in Hours
+const getSLAHours = (phase, category) => {
+    const cat = category ? category.toLowerCase() : 'default';
+    const limits = SLA_CONFIG[phase];
+    return limits[cat] || limits['default'];
 };
 
 /**
@@ -172,52 +195,83 @@ const assignOfficerToIssue = async (issueId, category, lat, lon, excludeOfficerI
 };
 
 /**
- * Background Task: Check SLAs and Reassign
+ * Background Task: Check Multi-Level SLAs and Track Breaches/Reassign
  */
 const checkSLAAndReassign = async () => {
-    console.log('[SLA Check] Running background check for SLA breaches...');
+    console.log('[SLA Check] Running background check for Multi-Level SLA breaches...');
 
     try {
-        // Find issues that are 'Assigned' and have breached SLA
-        // We iterate categories or just fetch all 'Assigned' and check dynamically.
-        // Optimized: Fetch issues where (NOW - assigned_at) > specific interval.
-        // Since interval varies by category, we might need a complex query or just fetch all 'Assigned' and filter in JS (easier for small scale).
-
-        // Let's stick to fetch all 'Assigned' for simplicity in this mini-project.
-
+        // Fetch all non-closed active issues that have an assigned officer
         const overdueIssues = await sql`
-            SELECT id, category, latitude, longitude, assigned_officer_id, assigned_at
+            SELECT id, category, status, latitude, longitude, assigned_officer_id, 
+                   assigned_at, acknowledged_at, in_progress_at, resolved_at, citizen_id
             FROM issues
-            WHERE status = 'Assigned'
+            WHERE status IN ('Assigned', 'In Progress') AND assigned_at IS NOT NULL
         `;
 
         for (const issue of overdueIssues) {
-            const hoursLimit = SLA_CONFIG[issue.category] || SLA_CONFIG['Default'];
-            const assignedAt = new Date(issue.assigned_at);
+            const cat = issue.category ? issue.category.toLowerCase() : 'default';
             const now = new Date();
-            const hoursDiff = (now - assignedAt) / (1000 * 60 * 60);
+            const assignedAt = new Date(issue.assigned_at);
+            const hoursSinceAssignment = (now - assignedAt) / (1000 * 60 * 60);
 
-            if (hoursDiff > hoursLimit) {
-                console.log(`[SLA Breach] Issue ${issue.id} (Category: ${issue.category}) exceeded ${hoursLimit}h limit. Reassigning...`);
+            // 1. Check Acknowledgement SLA (Time to accept)
+            // If the officer hasn't acknowledged it within the short SLA limit, it constitutes a breach and requires reassignment.
+            if (!issue.acknowledged_at && issue.status === 'Assigned') {
+                const ackLimit = getSLAHours('Acknowledgment', cat);
+                if (hoursSinceAssignment > ackLimit) {
+                    console.log(`[SLA Breach - Acknowledgment] Issue ${issue.id} exceeded ${ackLimit}h limit. Reassigning...`);
+                    
+                    try {
+                        await sendNotification(issue.citizen_id, "Delay Alert", "Your issue response was delayed. We are reassigning it to another officer.");
+                        if (process.env.ADMIN_EMAIL) {
+                            await sendNotification(issue.assigned_officer_id, "SLA Breach", `You failed to acknowledge Issue #${issue.id} in time. It has been reassigned.`);
+                        }
+                    } catch (e) { }
 
-                // SLA Notification
-                try {
-                    const c = await sql`SELECT citizen_id FROM issues WHERE id = ${issue.id}`;
-                    if (c.length > 0) await sendNotification(c[0].citizen_id, "Delay Alert", "Your issue is delayed, reassignment in progress.");
-                } catch (e) { }
+                    await assignOfficerToIssue(issue.id, issue.category, issue.latitude, issue.longitude, issue.assigned_officer_id);
+                    continue; // Reassigned, skip further SLA checks for this issue this round
+                }
+            }
 
-                // Reassign logic: Exclude current officer
-                await assignOfficerToIssue(
-                    issue.id,
-                    issue.category,
-                    issue.latitude,
-                    issue.longitude,
-                    issue.assigned_officer_id
-                );
+            // 2. Check Action SLA (Time to move to "In Progress")
+            // If the officer acknowledged it but hasn't moved it to In Progress within the moderate SLA limit.
+            if (!issue.in_progress_at && issue.status !== 'In Progress') {
+                const actionLimit = getSLAHours('Action', cat);
+                if (hoursSinceAssignment > actionLimit) {
+                    console.log(`[SLA Breach - Action] Issue ${issue.id} not set to 'In Progress' within ${actionLimit}h limit. Escalating...`);
+                    
+                    // Action SLA Breach might just send a fierce warning or escalate to Admin instead of instant reassignment.
+                    try {
+                         await sendNotification(issue.assigned_officer_id, "Warning: Action SLA Breach", `Issue #${issue.id} is overdue for Action.`);
+                    } catch(e) {}
+                    
+                    // You can optionally reassign here as well if required by the policy.
+                }
+            }
+
+            // 3. Check Resolution SLA (Time to fully fix the issue)
+            // If the issue is still active (even if In Progress) and hasn't been fixed within the Long SLA limit.
+            if (!issue.resolved_at) {
+                const resLimit = getSLAHours('Resolution', cat);
+                if (hoursSinceAssignment > resLimit) {
+                    console.log(`[SLA Breach - Resolution] Issue ${issue.id} not resolved within ${resLimit}h. Escalating to Admin...`);
+                    
+                    // Force Status to Escalated and remove assignment
+                    await sql`
+                        UPDATE issues 
+                        SET status = 'Escalated', updated_at = NOW(), assigned_officer_id = NULL
+                        WHERE id = ${issue.id}
+                    `;
+                    
+                    try {
+                        await sendNotification(issue.citizen_id, "Escalation Alert", "Resolution is taking too long. Escalated to Administrator.");
+                    } catch(e) {}
+                }
             }
         }
     } catch (err) {
-        console.error("Error in SLA Check:", err);
+        console.error("Error in Multi-Level SLA Check:", err);
     }
 };
 

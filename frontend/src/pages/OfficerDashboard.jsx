@@ -5,6 +5,13 @@ import { useTranslation } from 'react-i18next';
 import IssueMap from '../components/IssueMap';
 import '../styles/Dashboard.css'; // Inherit main gov styles
 import '../styles/OfficerDashboard.css';
+import MyLocationRoundedIcon from '@mui/icons-material/MyLocationRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
+import SyncRoundedIcon from '@mui/icons-material/SyncRounded';
+import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded';
+import PhotoCameraRoundedIcon from '@mui/icons-material/PhotoCameraRounded';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 
 const OfficerDashboard = () => {
     const { t, i18n } = useTranslation();
@@ -16,11 +23,23 @@ const OfficerDashboard = () => {
     const [selectedIssueId, setSelectedIssueId] = useState(null);
     const [resolutionImage, setResolutionImage] = useState(null);
     const [resolving, setResolving] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const getLocalizedDescription = (issue) => {
         if (!issue.description) return issue.voice_text || 'No description';
         if (typeof issue.description === 'string') return issue.description;
         return issue.description[i18n.language] || issue.description['en'] || issue.voice_text || 'No description';
+    };
+
+    const getFilteredIssues = () => {
+        if (!searchQuery.trim()) return issues;
+        const query = searchQuery.toLowerCase();
+        return issues.filter(issue => 
+            issue.id.toString().toLowerCase().includes(query) ||
+            issue.category.toLowerCase().includes(query) ||
+            getLocalizedDescription(issue).toLowerCase().includes(query) ||
+            issue.status.toLowerCase().includes(query)
+        );
     };
 
     useEffect(() => {
@@ -156,36 +175,108 @@ const OfficerDashboard = () => {
                 <section className="dashboard-section">
                     <div className="section-header dashboard-tabs-header">
                         <div>
-                            <h2 className="section-title">Assigned & Department Issues</h2>
-                            <p className="section-subtitle">Manage and update issue statuses efficiently</p>
+                            <h2 className="section-title">Department Snapshot</h2>
+                            <p className="section-subtitle">Real-time overview of your department's efficiency</p>
                         </div>
-                        <div className="view-toggle" style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button 
-                                className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setViewMode('list')}
-                            >
-                                List View
+                    </div>
+
+                    <div className="stats-grid">
+                        <div className="stat-card stat-card-info">
+                            <div className="stat-icon-wrap">
+                                <SearchRoundedIcon />
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-value">{issues.filter(i => i.status === 'Reported').length}</div>
+                                <div className="stat-label">Pending Review</div>
+                                <div className="stat-meta">Awaiting assignment</div>
+                            </div>
+                        </div>
+                        <div className="stat-card stat-card-warning">
+                            <div className="stat-icon-wrap">
+                                <AssignmentRoundedIcon />
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-value">{issues.filter(i => i.status === 'Assigned' || i.status === 'In Progress').length}</div>
+                                <div className="stat-label">Active Workload</div>
+                                <div className="stat-meta">Currently being addressed</div>
+                            </div>
+                        </div>
+                        <div className="stat-card stat-card-success">
+                            <div className="stat-icon-wrap">
+                                <CheckCircleRoundedIcon />
+                            </div>
+                            <div className="stat-content">
+                                <div className="stat-value">{issues.filter(i => i.status === 'Resolved' || i.status === 'Closed').length}</div>
+                                <div className="stat-label">Success Rate</div>
+                                <div className="stat-meta">Completed this month</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="section-header">
+                        <h2 className="section-title">Assigned & Department Issues</h2>
+                        <p className="section-subtitle">Manage and update issue statuses efficiently</p>
+                        
+                        <div className="search-filter-bar">
+                            <div className="search-wrapper">
+                                <input 
+                                    type="text" 
+                                    placeholder="Search by ID, category, or status..." 
+                                    className="search-input"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                                <svg 
+                                    viewBox="0 0 24 24" 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    strokeWidth="2.5" 
+                                    className="search-icon"
+                                >
+                                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                            </div>
+                            
+                            <button className="btn-icon-refresh" onClick={fetchIssues} title="Refresh issues">
+                                <SyncRoundedIcon />
                             </button>
-                            <button 
-                                className={`btn ${viewMode === 'map' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setViewMode('map')}
-                            >
-                                Map View
-                            </button>
+
+                            <div className="view-toggle">
+                                <button 
+                                    className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('list')}
+                                >
+                                    List View
+                                </button>
+                                <button 
+                                    className={`toggle-btn ${viewMode === 'map' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('map')}
+                                >
+                                    Map View
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     {loading ? (
-                        <div className="loading-state">Loading issues...</div>
-                    ) : issues.length === 0 ? (
-                        <div className="empty-state">No issues found for your department.</div>
+                        <div className="loading-state">
+                            <div className="loading-spinner"></div>
+                            <p>Loading issues...</p>
+                        </div>
+                    ) : getFilteredIssues().length === 0 ? (
+                        <div className="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
+                            </svg>
+                            <p>{searchQuery.trim() ? 'No issues match your search.' : 'No issues found for your department.'}</p>
+                        </div>
                     ) : viewMode === 'map' ? (
-                        <div style={{ marginTop: '20px' }}>
-                            <IssueMap issues={issues} height="600px" />
+                        <div className="map-container">
+                            <IssueMap issues={getFilteredIssues()} height="600px" />
                         </div>
                     ) : (
                         <div className="issues-grid">
-                            {issues.map(issue => {
+                            {getFilteredIssues().map(issue => {
                                 const isAssigned = issue.status === 'Assigned';
                                 // Safely format coordinates
                                 const lat = issue.latitude ? Number(issue.latitude) : null;
@@ -194,48 +285,80 @@ const OfficerDashboard = () => {
                                 // Safely format AI confidence
                                 const aiConfidence = issue.ai_confidence ? (Number(issue.ai_confidence) * 100).toFixed(0) : '0';
 
-                                return (
-                                    <div key={issue.id} className={`issue-card ${isAssigned ? 'assigned' : ''}`} onClick={() => navigate(`/issue/${issue.id}`)} style={{ cursor: 'pointer' }}>
+                                 return (
+                                    <div key={issue.id} className="issue-card" onClick={() => navigate(`/issue/${issue.id}`)} style={{ cursor: 'pointer' }}>
                                         <div className="issue-card-header">
-                                            <div className="issue-category">
-                                                {t('cat_' + (issue.category === 'Street Lighting' ? 'lighting' : issue.category === 'Water Supply' ? 'water' : issue.category.toLowerCase()), { defaultValue: issue.category })}
-                                                {isAssigned && <span className="assigned-badge">Assigned to you</span>}
+                                            <div className="issue-category-group">
+                                                <span className="category-text">
+                                                    {t('cat_' + (issue.category === 'Street Lighting' ? 'lighting' : issue.category === 'Water Supply' ? 'water' : issue.category.toLowerCase()), { defaultValue: issue.category })}
+                                                </span>
+                                                {isAssigned && (
+                                                    <span style={{ 
+                                                        fontSize: '0.65rem', 
+                                                        fontWeight: 800, 
+                                                        color: '#059669', 
+                                                        background: '#ecfdf5', 
+                                                        padding: '2px 8px', 
+                                                        borderRadius: '6px',
+                                                        textTransform: 'uppercase'
+                                                    }}>
+                                                        Assigned to you
+                                                    </span>
+                                                )}
+                                                {issue.status === 'Reported' && (new Date() - new Date(issue.timestamp)) / (1000 * 60 * 60 * 24) > 2 && (
+                                                    <span className="priority-chip">High Priority</span>
+                                                )}
                                             </div>
-                                            <div className="issue-id">#{issue.id}</div>
+                                            <span className="issue-id">#{issue.id}</span>
                                         </div>
 
                                         <div className="issue-description">
                                             {getLocalizedDescription(issue)}
                                         </div>
 
-                                        <div className="issue-meta-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--divider)' }}>
-                                            <div className="issue-meta">
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>📍 {locationStr}</span>
-                                                <span className={`ai-badge ${Number(aiConfidence) > 70 ? 'ai-verified' : 'ai-flagged'}`}>🤖 {aiConfidence}% Match</span>
-                                            </div>
-                                            <div className="issue-status-container">
-                                                <span className={`status-badge status-${issue.status.toLowerCase().replace(' ', '-')}`}>
+                                        <div className="issue-footer-meta">
+                                            <div className="meta-chips-row">
+                                                <div className="info-chip">
+                                                    <MyLocationRoundedIcon style={{ fontSize: '14px' }} />
+                                                    {locationStr}
+                                                </div>
+                                                <div className="info-chip">
+                                                    <SmartToyRoundedIcon style={{ fontSize: '14px' }} />
+                                                    {aiConfidence}% Match
+                                                </div>
+                                                <span className={`status-badge-new status-${issue.status.toLowerCase().replace(' ', '-')}`}>
                                                     {t('status_' + issue.status.toLowerCase().replace(' ', ''), { defaultValue: issue.status })}
                                                 </span>
+                                            </div>
+
+                                        <div className="status-select-wrapper">
+                                            <div className="issue-actions-new">
+                                                <select
+                                                    value={issue.status}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    onChange={(e) => handleStatusChange(issue.id, e.target.value)}
+                                                    className="action-select"
+                                                    style={{ minWidth: '160px' }}
+                                                >
+                                                    <option value="Reported">Reported</option>
+                                                    <option value="Assigned">Assigned (Self)</option>
+                                                    <option value="In Progress">In Progress</option>
+                                                    <option value="Resolved">Resolved</option>
+                                                    <option value="Rejected">Rejected</option>
+                                                </select>
                                                 {issue.image && (
-                                                    <a href={issue.image} target="_blank" rel="noreferrer" className="evidence-link">📷</a>
+                                                    <a 
+                                                        href={issue.image} 
+                                                        target="_blank" 
+                                                        rel="noreferrer" 
+                                                        className="evidence-link"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <PhotoCameraRoundedIcon style={{ fontSize: '20px' }} />
+                                                    </a>
                                                 )}
                                             </div>
                                         </div>
-
-                                        <div className="issue-actions">
-                                            <select
-                                                value={issue.status}
-                                                onClick={(e) => e.stopPropagation()}
-                                                onChange={(e) => handleStatusChange(issue.id, e.target.value)}
-                                                className="status-select"
-                                            >
-                                                <option value="Reported">Reported</option>
-                                                <option value="Assigned">Assigned (Self)</option>
-                                                <option value="In Progress">In Progress</option>
-                                                <option value="Resolved">Resolved</option>
-                                                <option value="Rejected">Rejected</option>
-                                            </select>
                                         </div>
                                     </div>
                                 );
@@ -248,7 +371,9 @@ const OfficerDashboard = () => {
                 {showResolveModal && (
                     <div className="modal-overlay">
                         <div className="modal-card">
-                            <h3 className="modal-title">✅ Verify Resolution</h3>
+                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center' }}>
+                                <CheckCircleRoundedIcon style={{ color: 'var(--success-color)' }} /> Verify Resolution
+                            </h3>
                             <p className="modal-subtitle">To mark this issue as Resolved, you must provide proof.</p>
 
                             <div className="modal-field">

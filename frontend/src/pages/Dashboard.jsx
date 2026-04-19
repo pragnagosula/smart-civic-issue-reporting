@@ -4,6 +4,18 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import IssueMap from '../components/IssueMap';
 import '../styles/Dashboard.css';
+import LightbulbCircleRoundedIcon from '@mui/icons-material/LightbulbCircleRounded';
+import WaterDropRoundedIcon from '@mui/icons-material/WaterDropRounded';
+import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded';
+import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
+import CleaningServicesRoundedIcon from '@mui/icons-material/CleaningServicesRounded';
+import WavesRoundedIcon from '@mui/icons-material/WavesRounded';
+import NaturePeopleRoundedIcon from '@mui/icons-material/NaturePeopleRounded';
+import RecyclingRoundedIcon from '@mui/icons-material/RecyclingRounded';
+import MyLocationRoundedIcon from '@mui/icons-material/MyLocationRounded';
+import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded';
+import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
+import PhotoCameraRoundedIcon from '@mui/icons-material/PhotoCameraRounded';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -160,17 +172,18 @@ const Dashboard = () => {
     };
 
     const getCategoryIcon = (category) => {
+        const iconStyle = { fontSize: 'inherit' };
         switch(category) {
-            case 'Street Lighting': return '💡';
-            case 'Water Supply': return '💧';
-            case 'Road Damage': return '🛣️';
-            case 'Garbage': return '🗑️';
-            case 'Roads': return '🛣️';
-            case 'Sanitation': return '🧹';
-            case 'Drainage': return '🌊';
-            case 'Parks': return '🌳';
-            case 'Solid Waste Management': return '♻️';
-            default: return '📌';
+            case 'Street Lighting': return <LightbulbCircleRoundedIcon style={iconStyle} />;
+            case 'Water Supply': return <WaterDropRoundedIcon style={iconStyle} />;
+            case 'Road Damage': return <ErrorRoundedIcon style={iconStyle} />;
+            case 'Garbage': return <DeleteRoundedIcon style={iconStyle} />;
+            case 'Roads': return <ErrorRoundedIcon style={iconStyle} />;
+            case 'Sanitation': return <CleaningServicesRoundedIcon style={iconStyle} />;
+            case 'Drainage': return <WavesRoundedIcon style={iconStyle} />;
+            case 'Parks': return <NaturePeopleRoundedIcon style={iconStyle} />;
+            case 'Solid Waste Management': return <RecyclingRoundedIcon style={iconStyle} />;
+            default: return <MyLocationRoundedIcon style={iconStyle} />;
         }
     };
 
@@ -446,37 +459,39 @@ const Dashboard = () => {
                                 >
                                     <div className="issue-card-header">
                                         <div className="issue-category">
-                                            <span className="category-icon-small">{getCategoryIcon(issue.category)}</span>
-                                            <span className="category-text">{issue.category}</span>
+                                            <span className="category-text">
+                                                {issue.category}
+                                            </span>
                                         </div>
                                         <div className="issue-id">#{issue.id}</div>
                                     </div>
 
-                                    <div className="issue-description">
+                                    <div className="issue-description" style={{ flexGrow: 1 }}>
                                         {getLocalizedDescription(issue)}
                                     </div>
 
-                                    <div className="issue-footer">
-                                        <div className="issue-meta">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <circle cx="12" cy="12" r="10" />
-                                                <path d="M12 6v6l4 2" />
-                                            </svg>
-                                            <span>{new Date(issue.timestamp?.endsWith('Z') ? issue.timestamp : issue.timestamp + 'Z').toLocaleDateString('en-IN')}</span>
-                                        </div>
-                                        <div className="issue-status-container">
-                                            <span className={`status-badge ${issue.status === 'Reported' && isOverdue(issue.created_at || issue.timestamp)
-                                                    ? 'status-overdue'
-                                                    : `status-${(issue.status || 'Reported').toLowerCase().replace(' ', '-')}`}`}>
-                                                {issue.status === 'Reported' && isOverdue(issue.created_at || issue.timestamp)
-                                                    ? 'OVERDUE'
-                                                    : (issue.status || 'Reported').toUpperCase()}
-                                            </span>
+                                    <div className="card-footer-recessed">
+                                        <div className="meta-chips-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                                            <div className="info-chip">
+                                                <AccessTimeRoundedIcon style={{ fontSize: '14px' }} />
+                                                {new Date(issue.timestamp?.endsWith('Z') ? issue.timestamp : issue.timestamp + 'Z').toLocaleDateString('en-IN')}
+                                            </div>
                                             {issue.ai_status && (
-                                                <span className={`ai-badge ai-${issue.ai_status.toLowerCase()}`}>
-                                                    🤖 {issue.ai_status}
-                                                </span>
+                                                <div className="info-chip">
+                                                    <SmartToyRoundedIcon style={{ fontSize: '14px' }} />
+                                                    {issue.ai_status}
+                                                </div>
                                             )}
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span className={`status-badge-unified ${
+                                                issue.status === 'Resolved' ? 'status-success' : 
+                                                issue.status === 'Rejected' ? 'status-danger' : 
+                                                issue.status === 'Reported' ? 'status-primary' : 'status-warning'
+                                            }`}>
+                                                {issue.status || 'Reported'}
+                                            </span>
+                                            {issue.image && <PhotoCameraRoundedIcon style={{ color: '#94a3b8', fontSize: '20px' }} />}
                                         </div>
                                     </div>
                                 </article>

@@ -25,6 +25,17 @@ ChartJS.register(
   ArcElement
 );
 
+const getLocalizedDescription = (issue) => {
+    if (!issue) return 'No description provided';
+    if (!issue.description && !issue.voice_text) return 'No description provided';
+    let desc = issue.description || issue.voice_text;
+    if (typeof desc === 'object') {
+        const lang = localStorage.getItem('language') || 'en';
+        desc = desc[lang] || desc['en'] || Object.values(desc)[0];
+    }
+    return String(desc || 'No description provided');
+};
+
 const AdminDashboard = () => {
     const [officers, setOfficers] = useState([]);
     const [issues, setIssues] = useState([]);
@@ -38,6 +49,7 @@ const AdminDashboard = () => {
     });
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('overview');
+    const [selectedIssue, setSelectedIssue] = useState(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -127,7 +139,7 @@ const AdminDashboard = () => {
 
     // Analytics Data Preparation
     const localityCounts = issues.reduce((acc, issue) => {
-        const loc = issue.address ? issue.address.split(',')[0] : getLocality(issue);
+        const loc = issue.address ? String(issue.address).split(',')[0] : getLocality(issue);
         acc[loc] = (acc[loc] || 0) + 1;
         return acc;
     }, {});
@@ -316,7 +328,11 @@ const AdminDashboard = () => {
                                 <h3>Critical: Escalated Issues Requiring Immediate Attention</h3>
                             </div>
                             <p>These issues have been rejected multiple times and require administrative review</p>
-                            <EscalatedIssuesTable issues={escalatedIssues} officers={officers} />
+                            <EscalatedIssuesTable 
+                                issues={escalatedIssues} 
+                                officers={officers} 
+                                onSelectIssue={setSelectedIssue}
+                            />
                         </aside>
                     </section>
                 )}
@@ -328,7 +344,11 @@ const AdminDashboard = () => {
                         <p className="section-subtitle">Complete system-wide issue tracking and management</p>
                     </div>
 
-                    <IssuesTable issues={issues} officers={officers} />
+                    <IssuesTable 
+                        issues={issues} 
+                        officers={officers} 
+                        onSelectIssue={setSelectedIssue}
+                    />
                 </section>
                 </>
                 )}
@@ -339,7 +359,16 @@ const AdminDashboard = () => {
                             <h2 className="section-title">City-wide Live Map</h2>
                             <p className="section-subtitle">Real-time geospatial view of all reported civic issues</p>
                         </div>
-                        <div style={{ padding: '16px', background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #e5e7eb' }}>
+                        <div style={{ 
+                            padding: '1.5rem', 
+                            background: 'white', 
+                            borderRadius: '28px', 
+                            overflow: 'visible', 
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)', 
+                            border: '1px solid #f1f5f9',
+                            marginTop: '2rem',
+                            width: '100%'
+                        }}>
                             <IssueMap issues={issues} height="700px" />
                         </div>
                     </section>
@@ -479,13 +508,21 @@ const AdminDashboard = () => {
                         </div>
                     </section>
                 )}
+                
+                {selectedIssue && (
+                    <IssueModal 
+                        issue={selectedIssue} 
+                        officers={officers}
+                        onClose={() => setSelectedIssue(null)}
+                    />
+                )}
             </main>
         </div>
     );
 };
 
 // Escalated Issues Table Component
-const EscalatedIssuesTable = ({ issues, officers }) => {
+const EscalatedIssuesTable = ({ issues, officers, onSelectIssue }) => {
     const getOfficerName = (id) => {
         const officer = officers.find(o => o.id === id);
         return officer ? officer.name : 'Unknown Officer';
@@ -515,7 +552,10 @@ const EscalatedIssuesTable = ({ issues, officers }) => {
                             </td>
                             <td>{new Date(issue.timestamp || issue.created_at).toLocaleDateString('en-IN')}</td>
                             <td>
-                                <button className="btn btn-sm btn-primary">
+                                <button 
+                                    className="btn btn-sm btn-primary"
+                                    onClick={() => onSelectIssue(issue)}
+                                >
                                     Review Case
                                 </button>
                             </td>
@@ -528,8 +568,7 @@ const EscalatedIssuesTable = ({ issues, officers }) => {
 };
 
 // All Issues Table Component
-const IssuesTable = ({ issues, officers }) => {
-    const [selectedIssue, setSelectedIssue] = useState(null);
+const IssuesTable = ({ issues, officers, onSelectIssue }) => {
 
     if (!issues || issues.length === 0) {
         return (
@@ -562,8 +601,8 @@ const IssuesTable = ({ issues, officers }) => {
                             <tr key={issue.id}>
                                 <td><span className="badge badge-info">{issue.category}</span></td>
                                 <td className="description-cell">
-                                    {(issue.voice_text || 'No description').substring(0, 100)}
-                                    {(issue.voice_text || '').length > 100 && '...'}
+                                    {String(getLocalizedDescription(issue)).substring(0, 100)}
+                                    {String(getLocalizedDescription(issue)).length > 100 && '...'}
                                 </td>
                                 <td>
                                     <span className={`status-badge status-${issue.status?.toLowerCase().replace(' ', '-') || 'reported'}`}>
@@ -578,7 +617,7 @@ const IssuesTable = ({ issues, officers }) => {
                                 <td>{new Date(issue.timestamp || issue.created_at).toLocaleDateString('en-IN')}</td>
                                 <td>
                                     <button 
-                                        onClick={() => setSelectedIssue(issue)}
+                                        onClick={() => onSelectIssue(issue)}
                                         className="btn btn-sm btn-primary"
                                     >
                                         View Details
@@ -589,14 +628,6 @@ const IssuesTable = ({ issues, officers }) => {
                     </tbody>
                 </table>
             </div>
-
-            {selectedIssue && (
-                <IssueModal 
-                    issue={selectedIssue} 
-                    officers={officers}
-                    onClose={() => setSelectedIssue(null)}
-                />
-            )}
         </>
     );
 };
@@ -681,7 +712,7 @@ const IssueModal = ({ issue, officers, onClose }) => {
 
                     <div className="detail-section">
                         <h4>Description</h4>
-                        <p>{issue.voice_text || 'No description provided'}</p>
+                        <p>{getLocalizedDescription(issue)}</p>
                     </div>
 
                     <div className="detail-section">

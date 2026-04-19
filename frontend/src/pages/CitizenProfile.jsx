@@ -187,9 +187,10 @@ const CitizenProfile = () => {
                                 {badges.slice(0, 4).map((badge, idx) => {
                                     const isUnlocked = badge.current >= badge.req;
                                     return (
-                                        <div key={idx} className={`badge-card ${isUnlocked ? 'unlocked' : 'locked'}`} title={badge.desc}>
-                                            <div style={{ fontSize: '1.5rem' }}>{badge.icon}</div>
-                                            <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>{badge.shortName}</span>
+                                        <div key={idx} className={`badge-card ${isUnlocked ? 'unlocked' : 'locked'}`}>
+                                            <div className={`badge-icon-large ${badge.colorClass}`}>{badge.icon}</div>
+                                            <span className="badge-name">{badge.shortName}</span>
+                                            <div className="badge-tooltip">{badge.desc}</div>
                                         </div>
                                     );
                                 })}

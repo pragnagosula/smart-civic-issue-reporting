@@ -306,7 +306,7 @@
 .status-pill.status-reported { background: #E0E7FF; color: #3730A3; }
 .status-pill.status-in-progress { background: #FEF3C7; color: #D97706; }
 .status-pill.status-resolved { background: #DCFCE7; color: #16A34A; }
-.status-pill.status-assigned { background: #F3E8FF; color: #7E22CE; }
+.status-pill.status-assigned { background: #DBEAFE; color: #1D4ED8; }
 .status-pill.status-flagged { background: #FEE2E2; color: #B91C1C; }
 
 .no-data {
@@ -517,7 +517,7 @@
 
 /* Status Semantic Colors */
 .status-tag.status-reported { background: var(--clr-reported); }
-.status-tag.status-assigned { background: var(--clr-assigned); }
+.status-tag.status-assigned { background: #3B82F6; }
 .status-tag.status-in-progress { background: var(--clr-progress); }
 .status-tag.status-resolved { background: var(--clr-resolved); }
 .status-tag.status-flagged { background: var(--clr-flagged); }

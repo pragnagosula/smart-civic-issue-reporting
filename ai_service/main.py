@@ -64,13 +64,64 @@ DEPARTMENT_PROFILES = {
     "sanitation": [
         "garbage",
         "waste collection",
-        "cleanliness"
+        "cleanliness",
+        "hygiene",
+        "sanitation and hygiene",
+        "sanitation & hygiene",
+        "public health",
+        "sanitary"
+    ],
+    "drainage": [
+        "drainage",
+        "sewage",
+        "storm water",
+        "drain blockage",
+        "drain cleaning",
+        "wastewater",
+        "drainage maintenance"
     ],
     "streetlight": [
         "streetlight",
+        "street lighting",
         "lamp post",
         "lighting"
+    ],
+    "solid_waste": [
+        "solid waste",
+        "waste management",
+        "garbage collection",
+        "waste segregation",
+        "landfill",
+        "municipal waste",
+        "sanitation"
+    ],
+    "parks": [
+        "parks",
+        "horticulture",
+        "garden",
+        "tree maintenance",
+        "green spaces",
+        "recreation"
+    ],
+    "general": [
+        "municipal",
+        "civic",
+        "department",
+        "officer",
+        "employee",
+        "identity"
     ]
+}
+
+DEPARTMENT_ALIASES = {
+    "roads": ["road", "roads department", "public works", "pwd"],
+    "water": ["water supply", "water board", "water works", "jal", "drinking water"],
+    "sanitation": ["sanitation & hygiene", "hygiene", "cleaning department", "swachh"],
+    "drainage": ["drainage system", "drain", "sewer", "sewage", "stormwater"],
+    "streetlight": ["street light", "street lighting", "electrical", "lighting department", "lamp post"],
+    "solid_waste": ["solid waste management", "swm", "waste management", "garbage department"],
+    "parks": ["parks & recreation", "park", "horticulture", "recreation"],
+    "general": ["other", "misc", "miscellaneous", "general"]
 }
 
 ISSUE_CATEGORIES = [
@@ -88,6 +139,27 @@ ISSUE_CATEGORIES = [
 # ===============================
 def normalize(text: str):
     return text.lower().strip()
+
+
+def canonical_department(raw_department: str):
+    dep = normalize(raw_department or "")
+    if dep in DEPARTMENT_PROFILES:
+        return dep
+
+    for canonical, aliases in DEPARTMENT_ALIASES.items():
+        for alias in aliases:
+            alias_norm = normalize(alias)
+            if dep == alias_norm or alias_norm in dep or dep in alias_norm:
+                return canonical
+
+    # Common punctuation/spacing variants.
+    compact = dep.replace("&", "and").replace("_", " ")
+    compact = " ".join(compact.split())
+    for canonical in DEPARTMENT_PROFILES.keys():
+        if canonical in compact:
+            return canonical
+
+    return dep
 
 
 def classify_image_from_base64(base64_str):
@@ -264,30 +336,121 @@ def analyze_issue(request: IssueAnalysisRequest):
 def screen_officer(request: OfficerScreeningRequest):
 
     try:
-        department = normalize(request.department)
+        if text_model is None:
+            raise HTTPException(status_code=503, detail="Text model not available")
+
+        department_input = normalize(request.department)
+        department = canonical_department(request.department)
+        extracted_text = " ".join((request.text or "").split())
+        extracted_text_norm = normalize(extracted_text)
 
         if department not in DEPARTMENT_PROFILES:
             return {
                 "ai_score": 0.0,
                 "ai_result": "FLAGGED",
-                "ai_reason": "Unknown Department"
+                "ai_reason": f"Unknown Department: {department_input}"
             }
 
-        doc_embedding = text_model.encode(request.text)
+        if len(extracted_text_norm) < 30:
+            return {
+                "ai_score": 0.0,
+                "ai_result": "PENDING_REVIEW",
+                "ai_reason": "Insufficient extracted text from document"
+            }
 
-        ref_text = department + " " + " ".join(DEPARTMENT_PROFILES[department])
+        doc_embedding = text_model.encode(extracted_text_norm)
+
+        expected_markers = [
+            "department",
+            "designation",
+            "employee",
+            "officer",
+            "municipal",
+            "government",
+            "authority",
+            "certificate",
+            "appointment",
+            "id"
+        ]
+        if request.designation:
+            expected_markers.append(normalize(request.designation))
+
+        department_signals = set(
+            [department]
+            + DEPARTMENT_PROFILES[department]
+            + DEPARTMENT_ALIASES.get(department, [])
+        )
+
+        reference_lines = [
+            f"Official document for {department} department officer",
+            " ".join(DEPARTMENT_PROFILES[department]),
+            " ".join(expected_markers)
+        ]
+        ref_text = " ".join(reference_lines)
 
         ref_embedding = text_model.encode(ref_text)
 
-        score = float(util.cos_sim(doc_embedding, ref_embedding)[0][0])
+        semantic_score = float(util.cos_sim(doc_embedding, ref_embedding)[0][0])
+        semantic_score = max(0.0, min(1.0, (semantic_score + 1.0) / 2.0))
+
+        keyword_hits = 0
+        all_keywords = set(list(department_signals) + expected_markers)
+        for kw in all_keywords:
+            if kw and kw in extracted_text_norm:
+                keyword_hits += 1
+
+        keyword_score = keyword_hits / max(1, len(all_keywords))
+
+        text_length_score = min(len(extracted_text_norm) / 500, 1.0)
+
+        has_department_line = (
+            "department" in extracted_text_norm
+            and any(sig in extracted_text_norm for sig in department_signals)
+        )
+        has_identity_markers = any(
+            marker in extracted_text_norm
+            for marker in ["id", "id no", "designation", "employee", "officer"]
+        )
+        has_designation_match = (
+            bool(request.designation)
+            and normalize(request.designation) in extracted_text_norm
+        )
+
+        signal_bonus = 0.0
+        if has_department_line:
+            signal_bonus += 0.12
+        if has_identity_markers:
+            signal_bonus += 0.04
+        if has_designation_match:
+            signal_bonus += 0.04
+
+        final_score = (
+            (semantic_score * 0.55)
+            + (keyword_score * 0.25)
+            + (text_length_score * 0.10)
+            + signal_bonus
+        )
+        final_score = round(max(0.0, min(1.0, final_score)), 2)
+
+        if final_score >= 0.62:
+            result = "APPROVED"
+            reason = "Strong department and document marker match"
+        elif final_score >= 0.35:
+            result = "PENDING_REVIEW"
+            reason = "Moderate match, requires manual verification"
+        else:
+            result = "FLAGGED"
+            reason = "Low relevance between document text and selected department"
 
         return {
-            "ai_score": round(score, 2),
-            "ai_result": "APPROVED" if score > 0.5 else "PENDING_REVIEW",
-            "ai_reason": "Officer Screening Completed"
+            "ai_score": final_score,
+            "ai_result": result,
+            "ai_reason": reason
         }
 
-    except:
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(status_code=500, detail="Officer Screening Failed")
 
 

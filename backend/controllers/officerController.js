@@ -1,7 +1,11 @@
 const sql = require('../db');
 const axios = require('axios');
 const fs = require('fs');
+const path = require('path');
 const cloudinary = require('cloudinary').v2;
+const pdfParse = require('pdf-parse');
+const Tesseract = require('tesseract.js');
+const sharp = require('sharp');
 const { sendNotification } = require('../services/notificationService');
 const { sendEmail } = require('../utils/emailService');
 
@@ -13,6 +17,99 @@ cloudinary.config({
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
+const OCR_MIN_TEXT_LENGTH = Number(process.env.OCR_MIN_TEXT_LENGTH || 80);
+
+const normalizeExtractedText = (text = '') => {
+    return text
+        .replace(/\s+/g, ' ')
+        .replace(/[^\x20-\x7E\n]/g, ' ')
+        .trim();
+};
+
+const scoreTextQuality = (text = '', confidence = 0) => {
+    const cleaned = normalizeExtractedText(text);
+    const lengthScore = Math.min(cleaned.length / 500, 1);
+    const confidenceScore = Math.min(Math.max(Number(confidence) || 0, 0) / 100, 1);
+    return Number((lengthScore * 0.6 + confidenceScore * 0.4).toFixed(3));
+};
+
+const extractTextFromPdf = async (filePath) => {
+    const buffer = fs.readFileSync(filePath);
+    const parsed = await pdfParse(buffer);
+    const text = normalizeExtractedText(parsed?.text || '');
+
+    return {
+        method: 'pdf-parse',
+        text,
+        confidence: 95,
+        pages: parsed?.numpages || 0
+    };
+};
+
+const extractTextFromImage = async (filePath) => {
+    const preprocessedPath = `${filePath}.ocr.png`;
+    let best = { text: '', confidence: 0, method: 'tesseract-original' };
+
+    try {
+        await sharp(filePath)
+            .grayscale()
+            .normalize()
+            .sharpen()
+            .png({ quality: 100 })
+            .toFile(preprocessedPath);
+
+        const preprocessedResult = await Tesseract.recognize(preprocessedPath, 'eng');
+        best = {
+            text: normalizeExtractedText(preprocessedResult?.data?.text || ''),
+            confidence: Number(preprocessedResult?.data?.confidence || 0),
+            method: 'tesseract-preprocessed'
+        };
+    } catch (e) {
+        // Fall through to original image OCR.
+    }
+
+    const originalResult = await Tesseract.recognize(filePath, 'eng');
+    const original = {
+        text: normalizeExtractedText(originalResult?.data?.text || ''),
+        confidence: Number(originalResult?.data?.confidence || 0),
+        method: 'tesseract-original'
+    };
+
+    const bestQuality = scoreTextQuality(best.text, best.confidence);
+    const originalQuality = scoreTextQuality(original.text, original.confidence);
+    const finalResult = originalQuality > bestQuality ? original : best;
+
+    try {
+        if (fs.existsSync(preprocessedPath)) fs.unlinkSync(preprocessedPath);
+    } catch (e) {
+        // Ignore temp cleanup failures.
+    }
+
+    return finalResult;
+};
+
+const extractTextFromDocument = async (file) => {
+    const mime = (file?.mimetype || '').toLowerCase();
+    const ext = path.extname(file?.originalname || '').toLowerCase();
+    const isPdf = mime.includes('pdf') || ext === '.pdf';
+
+    if (isPdf) {
+        const pdf = await extractTextFromPdf(file.path);
+        return {
+            ...pdf,
+            extractedLength: pdf.text.length,
+            quality: scoreTextQuality(pdf.text, pdf.confidence)
+        };
+    }
+
+    const image = await extractTextFromImage(file.path);
+    return {
+        ...image,
+        extractedLength: image.text.length,
+        quality: scoreTextQuality(image.text, image.confidence)
+    };
+};
 
 // ==============================
 // OFFICER REGISTRATION (BASIC VERSION - Works without OCR service)
@@ -53,7 +150,55 @@ const registerOfficer = async (req, res) => {
         }
         console.log("✅ Email available");
 
-        // 3️⃣ Upload to Cloudinary
+        // 3️⃣ Extract text from uploaded document (OCR/PDF parsing)
+        console.log("\n🧠 Extracting text from document...");
+        let extraction;
+        try {
+            extraction = await extractTextFromDocument(file);
+            console.log("✅ Document text extraction complete");
+            console.log(`   Method: ${extraction.method}`);
+            console.log(`   Length: ${extraction.extractedLength} chars`);
+            console.log(`   Confidence: ${Math.round(extraction.confidence || 0)}%`);
+            const previewLength = Number(process.env.OCR_PREVIEW_LENGTH || 500);
+            const preview = (extraction.text || '').slice(0, previewLength);
+            console.log("   Extracted Text Preview:");
+            console.log(`   ${preview || '[empty]'}`);
+            if ((extraction.text || '').length > previewLength) {
+                const remaining = extraction.text.length - previewLength;
+                console.log(`   ... (${remaining} more chars)`);
+            }
+
+            if (String(process.env.OCR_LOG_FULL_TEXT || '').toLowerCase() === 'true') {
+                console.log("   Full Extracted Text:");
+                console.log(extraction.text || '[empty]');
+            }
+
+            if (!extraction.text || extraction.extractedLength < OCR_MIN_TEXT_LENGTH) {
+                try { fs.unlinkSync(file.path); } catch (e) { }
+                return res.status(400).json({
+                    message: 'Document validation failed. Please upload a clearer official document.',
+                    details: {
+                        extracted_length: extraction.extractedLength,
+                        confidence: `${Math.round(extraction.confidence || 0)}%`,
+                        method: extraction.method,
+                        minimum_required: OCR_MIN_TEXT_LENGTH
+                    }
+                });
+            }
+        } catch (extractError) {
+            console.error('❌ Document extraction failed:', extractError.message);
+            try { fs.unlinkSync(file.path); } catch (e) { }
+            return res.status(400).json({
+                message: 'Document text extraction failed. Please upload a clearer PDF or image.',
+                details: {
+                    extracted_length: 0,
+                    confidence: '0%',
+                    method: 'failed'
+                }
+            });
+        }
+
+        // 4️⃣ Upload to Cloudinary
         console.log("\n☁️  Uploading to Cloudinary...");
         let documentUrl;
         try {
@@ -78,7 +223,7 @@ const registerOfficer = async (req, res) => {
             });
         }
 
-        // 4️⃣ AI Screening (Optional - defaults to PENDING if service unavailable)
+        // 5️⃣ AI Screening (Optional - defaults to PENDING if service unavailable)
         console.log("\n🤖 Attempting AI Screening...");
         let aiResult = {
             ai_score: 0.5,
@@ -88,13 +233,14 @@ const registerOfficer = async (req, res) => {
 
         try {
             const aiPayload = {
-                text: "Document uploaded for verification",
+                text: extraction.text,
                 department,
                 designation: designation || "Officer",
                 document_url: documentUrl
             };
 
             console.log("📤 Sending to AI service...");
+            console.log(`   Department Sent: ${department}`);
             const aiResponse = await axios.post(
                 `${AI_BASE}/screen-officer`,
                 aiPayload,
@@ -105,12 +251,13 @@ const registerOfficer = async (req, res) => {
             console.log("✅ AI screening complete");
             console.log(`   Score: ${aiResult.ai_score}`);
             console.log(`   Result: ${aiResult.ai_result}`);
+            console.log(`   Reason: ${aiResult.ai_reason}`);
 
         } catch (aiError) {
             console.log("⚠️  AI service unavailable - defaulting to PENDING");
         }
 
-        // 5️⃣ Determine Account Status
+        // 6️⃣ Determine Account Status
         console.log("\n🎯 Determining account status...");
         let accountStatus;
         let isVerified = false;
@@ -125,7 +272,7 @@ const registerOfficer = async (req, res) => {
             console.log("⏳ Pending admin review");
         }
 
-        // 6️⃣ Save to Database
+        // 7️⃣ Save to Database
         console.log("\n💾 Saving to database...");
         try {
             const newUser = await sql`
@@ -148,7 +295,7 @@ const registerOfficer = async (req, res) => {
             console.log(`   ID: ${officer.id}`);
             console.log(`   Status: ${accountStatus}`);
 
-            // 7️⃣ Send Notifications
+            // 8️⃣ Send Notifications
             console.log("\n📧 Sending notifications...");
             try {
                 // Notify officer
@@ -188,6 +335,12 @@ const registerOfficer = async (req, res) => {
                     account_status: officer.account_status,
                     ai_result: officer.ai_result,
                     ai_score: officer.ai_score
+                },
+                ocr_info: {
+                    method: extraction.method,
+                    extracted_length: extraction.extractedLength,
+                    confidence: `${Math.round(extraction.confidence || 0)}%`,
+                    quality: extraction.quality
                 },
                 next_steps: accountStatus === "PENDING" 
                     ? "Your application is under review. You will be notified via email once approved."

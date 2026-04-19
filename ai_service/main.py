@@ -132,6 +132,37 @@ ISSUE_CATEGORIES = [
     "road damage",
     "drainage blockage"
 ]
+CIVIC_PROMPTS = [
+    "A real-world outdoor public road with potholes, cracks, or damaged asphalt",
+    "A real-world outdoor public area with garbage, litter, or overflowing waste",
+    "A real-world outdoor streetlight pole or public lighting infrastructure",
+    "A real-world outdoor public water leakage from pipelines or water flowing on roads",
+    "A real-world outdoor drainage issue such as clogged drains, sewage overflow, or open manholes"
+
+]
+
+TRAP_PROMPTS = [
+    "A private indoor room with ceiling fan, indoor lighting, furniture, or curtains",
+    "A close-up photo of a person or human face",
+    "A photo of paper, printed text, mobile screen, or digital display",
+    "A very blurry or dark image with no clear subject"
+]
+
+ISSUE_CATEGORIES = CIVIC_PROMPTS + TRAP_PROMPTS
+
+# Mapping descriptive prompts back to backend department names
+PROMPT_TO_DEPT = {
+    "A real-world outdoor public road with potholes, cracks, or damaged asphalt": "Roads",
+    "A real-world outdoor public area with garbage, litter, or overflowing waste": "Sanitation",
+    "A real-world outdoor streetlight pole or public lighting infrastructure": "Streetlight",
+    "A real-world outdoor public water leakage from pipelines or water flowing on roads": "Water",
+    "A real-world outdoor drainage issue such as clogged drains, sewage overflow, or open manholes": "Drainage",
+    "A private indoor room with ceiling fan, indoor lighting, furniture, or curtains": "Flagged",
+    "A close-up photo of a person or human face": "Flagged",
+    "A photo of paper, printed text, mobile screen, or digital display": "Flagged",
+    "A very blurry or dark image with no clear subject": "Flagged"
+}
+
 
 
 # ===============================
@@ -168,7 +199,6 @@ def classify_image_from_base64(base64_str):
             base64_str = base64_str.split(",")[1]
 
         image_data = base64.b64decode(base64_str)
-
         image = Image.open(io.BytesIO(image_data)).convert("RGB")
 
         inputs = clip_processor(
@@ -181,13 +211,21 @@ def classify_image_from_base64(base64_str):
         with torch.no_grad():
             outputs = clip_model(**inputs)
 
-        probs = outputs.logits_per_image.softmax(dim=1)[0]
+        # Use sigmoid to get independent probabilities so 0.4 and 0.85 can co-exist
+        probs = torch.sigmoid(outputs.logits_per_image)[0].detach().numpy()
 
-        best_idx = probs.argmax().item()
+        civic_probs = probs[:len(CIVIC_PROMPTS)]
+        trap_probs = probs[len(CIVIC_PROMPTS):]
+
+        best_civic_idx = int(np.argmax(civic_probs))
+        best_trap_idx = int(np.argmax(trap_probs))
 
         return {
-            "category": ISSUE_CATEGORIES[best_idx],
-            "confidence": round(float(probs[best_idx]), 2)
+            "civic_score": float(civic_probs[best_civic_idx]),
+            "civic_prompt": CIVIC_PROMPTS[best_civic_idx],
+            "trap_score": float(trap_probs[best_trap_idx]),
+            "trap_prompt": TRAP_PROMPTS[best_trap_idx],
+            "best_overall_prompt": ISSUE_CATEGORIES[int(np.argmax(probs))]
         }
 
     except Exception as e:
@@ -273,28 +311,45 @@ def analyze_issue(request: IssueAnalysisRequest):
         if request.text and len(request.text.strip()) >= 5:
             text_result = classify_text(request.text)
 
-        # FUSION LOGIC
-        if image_result and text_result:
+        # FUSION LOGIC AND FINAL DECISION
+        if image_result:
+            trap_score = image_result["trap_score"]
+            civic_score = image_result["civic_score"]
+            predicted_category = PROMPT_TO_DEPT.get(image_result["civic_prompt"], "Other")
 
-            if image_result["confidence"] >= text_result["confidence"]:
-                final_category = image_result["category"]
-                final_confidence = image_result["confidence"]
-                reason = "Image-based classification stronger"
+            # Final Decision Logic (Dictated by Rules)
+            # Step 1: Trap override (highest priority)
+            if trap_score > 0.5:
+                category = "FLAGGED"
+            # Step 2: Conflict safety (prevents wrong 90% matches)
+            elif trap_score > 0.4 and civic_score > 0.85:
+                category = "FLAGGED"
+            # Step 3: Civic classification
+            elif civic_score > 0.85:
+                category = predicted_category
+            # Step 4: Uncertain cases
             else:
-                final_category = text_result["category"]
-                final_confidence = text_result["confidence"]
-                reason = "Text-based classification stronger"
+                category = "REVIEW_REQUIRED"
 
-        elif image_result:
-            final_category = image_result["category"]
-            final_confidence = image_result["confidence"]
-            reason = "Image-only classification"
+            final_confidence = max(trap_score, civic_score)
+            scene = "Indoor/Unclear" if "indoor" in image_result["trap_prompt"].lower() or trap_score > civic_score else "Outdoor"
+            ai_status = "CATEGORIZED" if category not in ["FLAGGED", "REVIEW_REQUIRED"] else "FLAGGED"
+            
+            if category == "REVIEW_REQUIRED":
+                 final_category = predicted_category # Preserve the guess but status is pending
+            else:
+                 final_category = category
 
-        elif text_result:
-            final_category = text_result["category"]
-            final_confidence = text_result["confidence"]
-            reason = "Text-only classification"
-
+            # Multi-line Reason Format
+            reason = (
+                f"Scene: {scene}\n"
+                f"Category: {final_category}\n"
+                f"Confidence: {round(final_confidence, 2)}\n\n"
+                f"Reason:\n"
+                f"- Scene detected: Civic ({round(civic_score, 2)}), Trap ({round(trap_score, 2)})\n"
+                f"- Key objects: {image_result['best_overall_prompt']}\n"
+                f"- Final decision: {category}"
+            )
         else:
             return {
                 "category": "Uncategorized",
@@ -303,16 +358,8 @@ def analyze_issue(request: IssueAnalysisRequest):
                 "ai_reason": "No valid image/text"
             }
 
-        # FINAL STATUS
-        if final_confidence >= 0.40:
-            ai_status = "CATEGORIZED"
-        elif final_confidence < 0.20:
-            ai_status = "FLAGGED"
-        else:
-            ai_status = "PENDING_REVIEW"
-
         return {
-            "category": final_category,
+            "category": final_category if final_category != "FLAGGED" else "Flagged",
             "ai_status": ai_status,
             "ai_confidence": round(final_confidence, 2),
             "ai_reason": reason
@@ -541,4 +588,4 @@ def health():
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

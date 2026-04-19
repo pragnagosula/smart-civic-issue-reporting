@@ -108,6 +108,7 @@ exports.reportIssue = async (req, res) => {
 
             if (aiResponse.data) {
                 aiResult = aiResponse.data;
+                console.log(`[AI DIAGNOSTIC] Score: ${aiResult.ai_confidence}, Status: ${aiResult.ai_status}, Category: ${aiResult.category}`);
             }
         } catch (err) {
             console.error('AI Service Error:', err.message);
@@ -119,9 +120,13 @@ exports.reportIssue = async (req, res) => {
         let issueStatus = 'Reported';
         let masterIssueId = null;
 
-        // If AI explicitly says FLAGGED or confidence is low
-        if (aiResult.ai_status === 'FLAGGED' || aiResult.category === 'Flagged' || (aiResult.ai_confidence > 0 && aiResult.ai_confidence < 0.35)) {
+        // HARD SAFETY NET: Explicitly block anything below 0.85 confidence
+        const isLowConfidence = aiResult.ai_confidence < 0.85;
+
+        if (aiResult.ai_status !== 'CATEGORIZED' || aiResult.category === 'Flagged' || isLowConfidence) {
             issueStatus = 'Flagged';
+            aiResult.category = 'Uncategorized'; // Force clean category to avoid false labels
+            console.log(`[BACKEND SAFETY] Issue Flagged. Confidence: ${aiResult.ai_confidence}. Threshold: 0.85`);
         } else {
             // Only check for duplicates if it's a valid, Verified issue
             try {
@@ -408,11 +413,10 @@ exports.getMyIssues = async (req, res) => {
     try {
         const citizen_id = req.user.id;
         // Optimize: Exclude 'image' column to speed up list loading
-        // Filter out FLAGGED issues from citizen view
         const issues = await sql`
             SELECT id, category, status, timestamp, voice_text, description, latitude, longitude, language, created_at, ai_status 
             FROM issues 
-            WHERE citizen_id = ${citizen_id} AND status != 'Flagged'
+            WHERE citizen_id = ${citizen_id}
             ORDER BY created_at DESC
         `;
 
@@ -448,8 +452,7 @@ exports.getAllIssues = async (req, res) => {
         const issues = await sql`
             SELECT id, category, status, timestamp, voice_text, description, latitude, longitude, language, created_at, ai_status
             FROM issues
-            WHERE status != 'Flagged'
-            AND (${pStatus}::text IS NULL OR LOWER(status) = LOWER(${pStatus}::text))
+            WHERE (${pStatus}::text IS NULL OR LOWER(status) = LOWER(${pStatus}::text))
             AND (${pCategory}::text IS NULL OR LOWER(category) = LOWER(${pCategory}::text))
             AND (${pSearch}::text IS NULL OR 
                 LOWER(COALESCE(voice_text, '')) LIKE LOWER(${pSearch}::text)

@@ -4,502 +4,517 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import IssueMap from '../components/IssueMap';
 import '../styles/Dashboard.css';
-import LightbulbCircleRoundedIcon from '@mui/icons-material/LightbulbCircleRounded';
-import WaterDropRoundedIcon from '@mui/icons-material/WaterDropRounded';
-import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded';
-import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
-import CleaningServicesRoundedIcon from '@mui/icons-material/CleaningServicesRounded';
-import WavesRoundedIcon from '@mui/icons-material/WavesRounded';
-import NaturePeopleRoundedIcon from '@mui/icons-material/NaturePeopleRounded';
-import RecyclingRoundedIcon from '@mui/icons-material/RecyclingRounded';
-import MyLocationRoundedIcon from '@mui/icons-material/MyLocationRounded';
-import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded';
-import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
-import PhotoCameraRoundedIcon from '@mui/icons-material/PhotoCameraRounded';
+import {
+    CalendarTodayRounded as DateIcon,
+    AddRounded as AddIcon,
+    SearchRounded as SearchIcon,
+    MapRounded as MapIcon,
+    ListRounded as ListIcon,
+    SmartToyRounded as AIIcon,
+    LightbulbCircleRounded as LightbulbIcon,
+    WaterDropRounded as WaterIcon,
+    ErrorRounded as RoadIcon,
+    DeleteRounded as GarbageIcon,
+    CleaningServicesRounded as SanitationIcon,
+    WavesRounded as DrainageIcon,
+    NaturePeopleRounded as ParksIcon,
+    RecyclingRounded as WasteIcon,
+    MyLocationRounded as OtherIcon,
+    FilterList as FilterIcon,
+    Sort as SortIcon,
+    KeyboardArrowUp as ArrowUpIcon,
+    KeyboardArrowDown as ArrowDownIcon,
+    LocationOn as LocationIcon,
+    Person as PersonIcon,
+    Schedule as ScheduleIcon,
+    CheckCircle as ResolvedIcon,
+    Error as EscalatedIcon,
+    Build as InProgressIcon,
+    Report as ReportedIcon,
+    ChevronLeft as ChevronLeftIcon,
+    ChevronRight as ChevronRightIcon,
+    FirstPage as FirstPageIcon,
+    LastPage as LastPageIcon
+} from '@mui/icons-material';
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const { t, i18n } = useTranslation();
 
-    const getLocalizedDescription = (issue) => {
-        if (!issue.description) return issue.voice_text || t('no_description');
-        if (typeof issue.description === 'string') return issue.description;
-        return issue.description[i18n.language] || issue.description['en'] || issue.voice_text || t('no_description');
-    };
-
     const [issues, setIssues] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({
-        total: 0,
-        resolved: 0,
-        inProgress: 0,
-        pending: 0
-    });
-    const [categoryStats, setCategoryStats] = useState({});
-
-    const [mainTab, setMainTab] = useState('overview');
-    const [tab, setTab] = useState('my');
-    const [viewMode, setViewMode] = useState('list');
     const [allIssues, setAllIssues] = useState([]);
-    const [allLoading, setAllLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({ total: 0, resolved: 0, inProgress: 0, pending: 0 });
+    const [categoryStats, setCategoryStats] = useState({});
+    
+    // NAVIGATION STATE
+    const [mainTab, setMainTab] = useState('overview'); // 'overview', 'categories', 'tracker'
+    const [tab, setTab] = useState('my'); // 'my' or 'all'
+    const [viewMode, setViewMode] = useState('list'); 
+    
+    // ENHANCED FILTER STATE
     const [searchText, setSearchText] = useState('');
     const [selectedStatus, setSelectedStatus] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
-    const [filters, setFilters] = useState({ search: '', status: '', category: '' });
+    const [sortField, setSortField] = useState('timestamp');
+    const [sortDirection, setSortDirection] = useState('desc');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(12);
 
-    const statusOptions = ['', 'Reported', 'Assigned', 'In Progress', 'Resolved', 'Closed'];
-    const categoryOptions = ['','Street Lighting', 'Water Supply', 'Road Damage', 'Garbage', 'Sanitation', 'Drainage', 'Parks', 'Solid Waste Management', 'Other'];
+    const statusOptions = ['', 'Reported', 'Assigned', 'In Progress', 'Resolved'];
+    const categoryOptions = ['', 'Roads', 'Water', 'Sanitation', 'Streetlight', 'Drainage', 'Parks', 'Waste', 'Other'];
 
     useEffect(() => {
         fetchIssues();
-        fetchAllIssues();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    useEffect(() => {
-        // Re-fetch issues when language changes
-        fetchIssues();
-        if (tab === 'all') {
-            fetchAllIssues();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [i18n.language]);
-
-    useEffect(() => {
-        if (tab === 'all') {
-            fetchAllIssues();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters, tab]);
+    }, [mainTab, tab, i18n.language]);
 
     const fetchIssues = async () => {
         try {
+            setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/my-issues`, {
+            
+            // Fetch user's issues for overview and my issues tab
+            const myIssuesResponse = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/my-issues`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const issuesData = response.data;
-            setIssues(issuesData);
+            const myIssuesData = myIssuesResponse.data;
+            setIssues(myIssuesData);
 
-            setStats({
-                total: issuesData.length,
-                resolved: issuesData.filter(i => i.status === 'Resolved' || i.status === 'Closed').length,
-                inProgress: issuesData.filter(i => i.status === 'In Progress' || i.status === 'Assigned').length,
-                pending: issuesData.filter(i => i.status === 'Reported').length
-            });
-
-            const cats = {};
-            issuesData.forEach(issue => {
-                const cat = issue.category || 'Other';
-                cats[cat] = (cats[cat] || 0) + 1;
-            });
-            setCategoryStats(cats);
-        } catch (err) {
-            console.error("Error fetching issues:", err);
-            if (err.response?.status === 401) {
-                navigate('/login');
+            // Fetch all issues if we're on tracker tab and all issues is selected
+            if (mainTab === 'tracker' && tab === 'all') {
+                const allIssuesResponse = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/all`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setAllIssues(allIssuesResponse.data);
             }
+
+            // Calculate Stats (always from user's issues)
+            setStats({
+                total: myIssuesData.length,
+                resolved: myIssuesData.filter(i => i.status === 'Resolved').length,
+                inProgress: myIssuesData.filter(i => i.status === 'In Progress' || i.status === 'Assigned').length,
+                pending: myIssuesData.filter(i => i.status === 'Reported').length
+            });
+
+            // Calculate Categories (always from user's issues)
+            const cats = {};
+            myIssuesData.forEach(i => { cats[i.category] = (cats[i.category] || 0) + 1; });
+            setCategoryStats(cats);
+
+        } catch (err) {
+            console.error(err);
+            if (err.response?.status === 401) navigate('/login');
         } finally {
             setLoading(false);
         }
     };
 
-    const fetchAllIssues = async (activeFilters = filters) => {
-        try {
-            setAllLoading(true);
-            const token = localStorage.getItem('token');
-            const params = new URLSearchParams();
-            if (activeFilters.search) params.append('search', activeFilters.search);
-            if (activeFilters.status) params.append('status', activeFilters.status);
-            if (activeFilters.category) params.append('category', activeFilters.category);
-            const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/issues/all?${params.toString()}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setAllIssues(response.data);
-        } catch (err) {
-            console.error('Error fetching all issues:', err);
-            if (err.response?.status === 401) {
-                navigate('/login');
-            }
-        } finally {
-            setAllLoading(false);
-        }
-    };
-
-    const handleApplyFilters = () => {
-        const nextFilters = {
-            search: searchText.trim(),
-            status: selectedStatus,
-            category: selectedCategory
-        };
-        setFilters(nextFilters);
-        if (tab === 'all') {
-            fetchAllIssues(nextFilters);
-        }
-    };
-
-    const handleResetFilters = () => {
-        setSearchText('');
-        setSelectedStatus('');
-        setSelectedCategory('');
-        const resetFilters = { search: '', status: '', category: '' };
-        setFilters(resetFilters);
-        if (tab === 'all') {
-            fetchAllIssues(resetFilters);
-        }
-    };
-
     const handleLogout = () => {
         localStorage.removeItem('token');
-        localStorage.removeItem('language');
-        i18n.changeLanguage('en');
         navigate('/login');
     };
 
-    const handleReportIssue = () => {
-        navigate('/report-issue');
+    // Enhanced filtering and sorting logic
+    const getCurrentIssues = () => {
+        return tab === 'all' ? allIssues : issues;
     };
 
-    const handleProfile = () => {
-        navigate('/citizen/profile');
-    };
+    const filteredAndSortedIssues = getCurrentIssues()
+        .filter(issue => {
+            const description = issue.description?.en || issue.voice_text || '';
+            const matchesSearch = !searchText ||
+                description.toLowerCase().includes(searchText.toLowerCase()) ||
+                issue.category.toLowerCase().includes(searchText.toLowerCase()) ||
+                (issue.address && issue.address.toLowerCase().includes(searchText.toLowerCase()));
 
-    const isOverdue = (createdAt) => {
-        const created = new Date(createdAt);
-        const now = new Date();
-        const diffDays = (now - created) / (1000 * 60 * 60 * 24);
-        return diffDays > 7;
-    };
+            const matchesStatus = !selectedStatus || issue.status === selectedStatus;
+            const matchesCategory = !selectedCategory || issue.category === selectedCategory;
 
-    const getCategoryIcon = (category) => {
-        const iconStyle = { fontSize: 'inherit' };
-        switch(category) {
-            case 'Street Lighting': return <LightbulbCircleRoundedIcon style={iconStyle} />;
-            case 'Water Supply': return <WaterDropRoundedIcon style={iconStyle} />;
-            case 'Road Damage': return <ErrorRoundedIcon style={iconStyle} />;
-            case 'Garbage': return <DeleteRoundedIcon style={iconStyle} />;
-            case 'Roads': return <ErrorRoundedIcon style={iconStyle} />;
-            case 'Sanitation': return <CleaningServicesRoundedIcon style={iconStyle} />;
-            case 'Drainage': return <WavesRoundedIcon style={iconStyle} />;
-            case 'Parks': return <NaturePeopleRoundedIcon style={iconStyle} />;
-            case 'Solid Waste Management': return <RecyclingRoundedIcon style={iconStyle} />;
-            default: return <MyLocationRoundedIcon style={iconStyle} />;
+            return matchesSearch && matchesStatus && matchesCategory;
+        })
+        .sort((a, b) => {
+            let aValue, bValue;
+
+            switch (sortField) {
+                case 'category':
+                    aValue = a.category;
+                    bValue = b.category;
+                    break;
+                case 'status':
+                    aValue = a.status;
+                    bValue = b.status;
+                    break;
+                case 'timestamp':
+                default:
+                    aValue = new Date(a.timestamp || a.created_at);
+                    bValue = new Date(b.timestamp || b.created_at);
+                    break;
+            }
+
+            if (sortDirection === 'asc') {
+                return aValue > bValue ? 1 : -1;
+            } else {
+                return aValue < bValue ? 1 : -1;
+            }
+        });
+
+    // Pagination
+    const totalPages = Math.ceil(filteredAndSortedIssues.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedIssues = filteredAndSortedIssues.slice(startIndex, startIndex + itemsPerPage);
+
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
         }
     };
 
-    if (loading) {
-        return (
-            <div className="loading-overlay">
-                <div className="spinner"></div>
-                <p style={{ marginTop: '1.5rem', color: '#616161', fontSize: '1rem' }}>{t('loading_dashboard')}</p>
-            </div>
-        );
-    }
+    const getSortIcon = (field) => {
+        if (sortField !== field) return <SortIcon fontSize="small" style={{ opacity: 0.3 }} />;
+        return sortDirection === 'asc' ?
+            <ArrowUpIcon fontSize="small" /> :
+            <ArrowDownIcon fontSize="small" />;
+    };
+
+    const resetFilters = () => {
+        setSearchText('');
+        setSelectedStatus('');
+        setSelectedCategory('');
+        setCurrentPage(1);
+    };
+
+    // Enhanced category icon function
+    const getCategoryIcon = (cat) => {
+        const style = { fontSize: 24 };
+        if (cat?.includes('Road')) return <RoadIcon style={style} />;
+        if (cat?.includes('Water')) return <WaterIcon style={style} />;
+        if (cat?.includes('Light')) return <LightbulbIcon style={style} />;
+        if (cat?.includes('Garbage') || cat?.includes('Waste')) return <WasteIcon style={style} />;
+        if (cat?.includes('Sanitation')) return <SanitationIcon style={style} />;
+        if (cat?.includes('Drainage')) return <DrainageIcon style={style} />;
+        if (cat?.includes('Park')) return <ParksIcon style={style} />;
+        return <OtherIcon style={style} />;
+    };
+
+    // Status icons for enhanced display
+    const getStatusIcon = (status) => {
+        const iconMap = {
+            'Reported': <ReportedIcon fontSize="small" />,
+            'Assigned': <PersonIcon fontSize="small" />,
+            'In Progress': <InProgressIcon fontSize="small" />,
+            'Resolved': <ResolvedIcon fontSize="small" />
+        };
+        return iconMap[status] || <ReportedIcon fontSize="small" />;
+    };
+
+    if (loading && mainTab === 'overview') return <div className="loading-overlay"><div className="spinner"></div></div>;
 
     return (
         <div className="citizen-dashboard">
-            {/* Official Government Header */}
+            {/* 🏛️ RESTORED GOVERNMENT HEADER */}
             <header className="gov-header">
                 <div className="gov-header-content">
                     <div className="gov-emblem">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2L2 7L12 12L22 7L12 2Z" />
-                            <path d="M2 17L12 22L22 17" />
-                            <path d="M2 12L12 17L22 12" />
-                        </svg>
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7L12 12L22 7L12 2Z" /><path d="M2 17L12 22L22 17" /><path d="M2 12L12 17L22 12" /></svg>
                     </div>
-                    
                     <div className="gov-header-title-section">
-                        <h1 className="gov-title">{t('civicfix_portal')}</h1>
-                        <p className="gov-subtitle">{t('gov_subtitle')}</p>
+                        <h1 className="gov-title">CivicFix Portal</h1>
+                        <p className="gov-subtitle">OFFICIAL CITIZEN REPORTING & MONITORING SYSTEM</p>
                     </div>
-                    
                     <div className="gov-header-actions">
-                        <button className="btn btn-profile no-print" onClick={handleProfile}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                <circle cx="12" cy="7" r="4" />
-                            </svg>
-                            {t('profile')}
-                        </button>
-                        <button className="btn btn-logout no-print" onClick={handleLogout}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
-                            </svg>
-                            {t('logout')}
-                        </button>
+                        <button className="btn-profile" onClick={() => navigate('/citizen/profile')}>MY PROFILE</button>
+                        <button className="btn-logout" onClick={handleLogout}>LOGOUT</button>
                     </div>
                 </div>
             </header>
 
+            {/* 📑 RESTORED TABS NAVIGATION */}
             <div className="citizen-tabs">
                 <div className="tabs-container">
-                    <button className={`tab-btn ${mainTab === 'overview' ? 'active' : ''}`} onClick={() => setMainTab('overview')}>{t('dashboard_overview') || 'Dashboard Overview'}</button>
-                    {Object.keys(categoryStats).length > 0 && <button className={`tab-btn ${mainTab === 'categories' ? 'active' : ''}`} onClick={() => setMainTab('categories')}>{t('issues_by_category') || 'Issues by Category'}</button>}
-                    <button className={`tab-btn ${mainTab === 'tracker' ? 'active' : ''}`} onClick={() => setMainTab('tracker')}>Citizen Issue Tracker</button>
+                    <button className={`tab-btn ${mainTab === 'overview' ? 'active' : ''}`} onClick={() => setMainTab('overview')}>OVERVIEW</button>
+                    <button className={`tab-btn ${mainTab === 'tracker' ? 'active' : ''}`} onClick={() => setMainTab('tracker')}>ISSUE TRACKER</button>
                 </div>
             </div>
 
             <main className="dashboard-container">
-                {/* System Overview Statistics */}
+                {/* 1. OVERVIEW & CATEGORIES COMBINED */}
                 {mainTab === 'overview' && (
-                <section className="dashboard-section">
-                    <div className="section-header">
-                        <h2 className="section-title">{t('dashboard_overview')}</h2>
-                        <p className="section-subtitle">{t('summary_subtitle')}</p>
-                    </div>
-
-                    <div className="stats-grid">
-                        <article className="stat-card stat-card-primary">
-                            <div className="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                    <polyline points="14 2 14 8 20 8" />
-                                </svg>
+                    <section className="dashboard-section combined-overview">
+                        {/* TOP STATS ROW */}
+                        <div className="stats-grid">
+                            <div className="stat-card stat-total">
+                                <div className="stat-val">{stats.total}</div>
+                                <div className="stat-lab">TOTAL ISSUES</div>
+                                <div className="stat-pill pill-grey">All time</div>
                             </div>
-                            <div className="stat-content">
-                                <div className="stat-value">{stats.total}</div>
-                                <div className="stat-label">{t('total_issues')}</div>
-                                <div className="stat-meta">{t('all_time')}</div>
+                            <div className="stat-card stat-resolved">
+                                <div className="stat-val">{stats.resolved}</div>
+                                <div className="stat-lab">RESOLVED</div>
+                                <div className="stat-pill pill-green">{stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0}% rate</div>
                             </div>
-                        </article>
-
-                        <article className="stat-card stat-card-success">
-                            <div className="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                    <polyline points="22 4 12 14.01 9 11.01" />
-                                </svg>
+                            <div className="stat-card stat-progress">
+                                <div className="stat-val">{stats.inProgress}</div>
+                                <div className="stat-lab">IN PROGRESS</div>
+                                <div className="stat-pill pill-orange">{stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0}% of total</div>
                             </div>
-                            <div className="stat-content">
-                                <div className="stat-value">{stats.resolved}</div>
-                                <div className="stat-label">{t('resolved')}</div>
-                                <div className="stat-meta">{t('completed')}</div>
+                            <div className="stat-card stat-pending">
+                                <div className="stat-val">{stats.pending}</div>
+                                <div className="stat-lab">PENDING</div>
+                                <div className="stat-pill pill-grey">Unassigned</div>
                             </div>
-                        </article>
-
-                        <article className="stat-card stat-card-warning">
-                            <div className="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <path d="M12 6v6l4 2" />
-                                </svg>
-                            </div>
-                            <div className="stat-content">
-                                <div className="stat-value">{stats.inProgress}</div>
-                                <div className="stat-label">{t('in_progress')}</div>
-                                <div className="stat-meta">{t('active')}</div>
-                            </div>
-                        </article>
-
-                        <article className="stat-card stat-card-info">
-                            <div className="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="12" y1="16" x2="12" y2="12" />
-                                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                                </svg>
-                            </div>
-                            <div className="stat-content">
-                                <div className="stat-value">{stats.pending}</div>
-                                <div className="stat-label">{t('pending')}</div>
-                                <div className="stat-meta">{t('awaiting')}</div>
-                            </div>
-                        </article>
-                    </div>
-                </section>
-                )}
-
-                {/* Category Breakdown */}
-                {mainTab === 'categories' && Object.keys(categoryStats).length > 0 && (
-                    <section className="dashboard-section">
-                        <div className="section-header">
-                            <h2 className="section-title">{t('issues_by_category')}</h2>
-                            <p className="section-subtitle">{t('breakdown_subtitle')}</p>
                         </div>
 
-                        <div className="category-cards-grid">
-                            {Object.entries(categoryStats).map(([cat, count]) => (
-                                <div key={cat} className="category-card">
-                                    <div className="category-card-icon">{getCategoryIcon(cat)}</div>
-                                    <div className="category-card-content">
-                                        <div className="category-card-name">{cat}</div>
-                                        <div className="category-card-count">{count} {count === 1 ? t('issue') : t('issues')}</div>
-                                    </div>
+                        {/* BOTTOM PANELS ROW */}
+                        <div className="overview-panels">
+                            {/* ISSUES BY CATEGORY */}
+                            <div className="panel category-panel">
+                                <h3><div className="icon-circle">◎</div> ISSUES BY CATEGORY</h3>
+                                <div className="category-list">
+                                    {Object.entries(categoryStats).map(([cat, count]) => {
+                                        const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                                        return (
+                                            <div key={cat} className="category-row">
+                                                <div className="cat-name-col">
+                                                    <div className="cat-dot"></div>
+                                                    <span className="cat-text">{cat}</span>
+                                                </div>
+                                                <div className="cat-bar-col">
+                                                    <div className="progress-bg">
+                                                        <div className="progress-fill" style={{width: `${percentage}%`}}></div>
+                                                    </div>
+                                                </div>
+                                                <div className="cat-count-col">{count} report{count !== 1 ? 's' : ''}</div>
+                                            </div>
+                                        );
+                                    })}
+                                    {Object.keys(categoryStats).length === 0 && <div className="no-data">No reported categories</div>}
                                 </div>
-                            ))}
+                            </div>
+
+                            {/* RECENT ACTIVITY */}
+                            <div className="panel activity-panel">
+                                <h3><ListIcon style={{fontSize: 18, color: '#64748B'}} /> RECENT ACTIVITY</h3>
+                                <div className="activity-list">
+                                    {issues.slice(0, 4).map(issue => (
+                                        <div key={issue.id} className="activity-item">
+                                            <div className="activity-timeline-line"></div>
+                                            <div className="activity-dot-main"></div>
+                                            <div className="activity-content">
+                                                <div className="activity-title">
+                                                    {issue.category} — {issue.description?.en || issue.voice_text || 'Reported Issue'}
+                                                </div>
+                                                <div className="activity-meta">
+                                                    <span className={`status-pill status-${issue.status?.toLowerCase().replace(' ', '-')}`}>
+                                                        {issue.status}
+                                                    </span>
+                                                    <span className="time-ago">
+                                                        {new Date(issue.timestamp || issue.created_at).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {issues.length === 0 && <div className="no-data">No recent activity</div>}
+                                </div>
+                            </div>
                         </div>
                     </section>
                 )}
 
-                {/* Report New Issue CTA */}
+                {/* 3. TRACKER TAB (ENHANCED) */}
                 {mainTab === 'tracker' && (
-                <>
-                <section className="dashboard-section">
-                    <div className="cta-container">
-                        <button className="btn-report-large" onClick={handleReportIssue}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <line x1="12" y1="5" x2="12" y2="19" />
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                            </svg>
-                            Report New Issue
-                        </button>
-                    </div>
-                </section>
-
-                {/* Issue Lists */}
-                <section className="dashboard-section">
-                    <div className="section-header dashboard-tabs-header">
-                        <div>
-                            <h2 className="section-title">Citizen Issue Tracker</h2>
-                            <p className="section-subtitle">Browse your reports or explore all civic issues in the area</p>
-                        </div>
-                        <div className="dashboard-tabs">
-                            <button
-                                className={`tab-button ${tab === 'my' ? 'tab-button-active' : ''}`}
-                                onClick={() => setTab('my')}
-                            >
-                                My Issues
-                            </button>
-                            <button
-                                className={`tab-button ${tab === 'all' ? 'tab-button-active' : ''}`}
-                                onClick={() => setTab('all')}
-                            >
-                                All Issues
-                            </button>
-                        </div>
-                        <div className="view-toggle" style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                            <button 
-                                className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setViewMode('list')}
-                            >
-                                List View
-                            </button>
-                            <button 
-                                className={`btn ${viewMode === 'map' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setViewMode('map')}
-                            >
-                                Map View
-                            </button>
-                        </div>
-                    </div>
-
-                    {tab === 'all' && (
-                        <div className="filter-toolbar">
-                            <input
-                                type="text"
-                                className="search-input"
-                                placeholder="Search by description, location, or reporter"
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                            />
-                            <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
-                                {statusOptions.map((status) => (
-                                    <option key={status} value={status}>{status || 'All Statuses'}</option>
-                                ))}
-                            </select>
-                            <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-                                {categoryOptions.map((category) => (
-                                    <option key={category} value={category}>{category || 'All Categories'}</option>
-                                ))}
-                            </select>
-                            <div className="filter-buttons">
-                                <button className="btn btn-secondary" onClick={handleApplyFilters}>Apply</button>
-                                <button className="btn btn-tertiary" onClick={handleResetFilters}>Reset</button>
+                    <section className="dashboard-section">
+                        {/* Enhanced Control Row */}
+                        <div className="tracker-toolbar-v4">
+                            <div className="toolbar-left-v4">
+                                <div className="pill-toggle">
+                                    <button className={tab === 'my' ? 'active' : ''} onClick={() => { setTab('my'); setCurrentPage(1); }}>MY ISSUES</button>
+                                    <button className={tab === 'all' ? 'active' : ''} onClick={() => { setTab('all'); setCurrentPage(1); }}>ALL ISSUES</button>
+                                </div>
+                                <div className="pill-toggle">
+                                    <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}><ListIcon style={{ fontSize: 18 }} /></button>
+                                    <button className={viewMode === 'map' ? 'active' : ''} onClick={() => setViewMode('map')}><MapIcon style={{ fontSize: 18 }} /></button>
+                                </div>
                             </div>
-                        </div>
-                    )}
-
-                    {(tab === 'my' ? loading : allLoading) ? (
-                        <div className="loading-overlay small">
-                            <div className="spinner"></div>
-                            <p style={{ marginTop: '1rem', color: '#616161', fontSize: '0.95rem' }}>
-                                {tab === 'my' ? 'Loading your issues...' : 'Loading all issues...'}
-                            </p>
-                        </div>
-                    ) : (tab === 'my' ? issues : allIssues).length === 0 ? (
-                        <div className="empty-state-card">
-                            <div className="empty-state-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                    <polyline points="14 2 14 8 20 8" />
-                                </svg>
-                            </div>
-                            <h3 className="empty-state-title">
-                                {tab === 'my' ? 'No Issues Reported Yet' : 'No Issues Found'}
-                            </h3>
-                            <p className="empty-state-text">
-                                {tab === 'my'
-                                    ? 'Start by reporting your first civic issue to help improve your community.'
-                                    : 'Try adjusting the filters or search terms to find what you need.'}
-                            </p>
-                            {tab === 'my' && (
-                                <button className="btn btn-primary" onClick={handleReportIssue}>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <line x1="12" y1="5" x2="12" y2="19" />
-                                        <line x1="5" y1="12" x2="19" y2="12" />
-                                    </svg>
-                                    Report Your First Issue
+                            
+                            <div className="toolbar-right-v4">
+                                <button className="btn-report-v4" onClick={() => navigate('/report-issue')}>
+                                    <AddIcon /> REPORT NEW ISSUE
                                 </button>
-                            )}
+                            </div>
                         </div>
-                    ) : viewMode === 'map' ? (
-                        <div style={{ marginTop: '20px' }}>
-                            <IssueMap issues={tab === 'my' ? issues : allIssues} height="600px" />
+
+                        {/* Enhanced Filter Strip */}
+                        <div className="issues-controls">
+                            <div className="search-filter-row">
+                                <div className="search-input-wrapper">
+                                    <SearchIcon className="search-icon" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search issues by description, category, or location..."
+                                        value={searchText}
+                                        onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1); }}
+                                        className="search-input"
+                                    />
+                                </div>
+
+                                <div className="filter-group">
+                                    <span className="filter-label">Status</span>
+                                    <select
+                                        value={selectedStatus}
+                                        onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
+                                        className="filter-select"
+                                    >
+                                        <option value="">All Statuses</option>
+                                        <option value="Reported">Reported</option>
+                                        <option value="Assigned">Assigned</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Resolved">Resolved</option>
+                                    </select>
+                                </div>
+
+                                <div className="filter-group">
+                                    <span className="filter-label">Category</span>
+                                    <select
+                                        value={selectedCategory}
+                                        onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
+                                        className="filter-select"
+                                    >
+                                        <option value="">All Categories</option>
+                                        <option value="Roads">Roads</option>
+                                        <option value="Water">Water</option>
+                                        <option value="Sanitation">Sanitation</option>
+                                        <option value="Streetlight">Streetlight</option>
+                                        <option value="Drainage">Drainage</option>
+                                        <option value="Parks">Parks</option>
+                                        <option value="Waste">Waste</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div className="filter-group sort-group">
+                                    <span className="filter-label">Sort by</span>
+                                    <select
+                                        value={`${sortField}-${sortDirection}`}
+                                        onChange={(e) => {
+                                            const [field, direction] = e.target.value.split('-');
+                                            setSortField(field);
+                                            setSortDirection(direction);
+                                            setCurrentPage(1);
+                                        }}
+                                        className="filter-select"
+                                    >
+                                        <option value="timestamp-desc">Newest first</option>
+                                        <option value="timestamp-asc">Oldest first</option>
+                                        <option value="category-asc">Category A-Z</option>
+                                        <option value="category-desc">Category Z-A</option>
+                                        <option value="status-asc">Status A-Z</option>
+                                        <option value="status-desc">Status Z-A</option>
+                                    </select>
+                                </div>
+
+                                <button onClick={resetFilters} className="filter-clear-btn">
+                                    Clear filters
+                                </button>
+                            </div>
+
+                            <div className="results-info">
+                                Showing {paginatedIssues.length} of {filteredAndSortedIssues.length} issues
+                                {(searchText || selectedStatus || selectedCategory) && (
+                                    <span className="filter-active"> filtered</span>
+                                )}
+                            </div>
                         </div>
-                    ) : (
-                        <div className="issues-grid">
-                            {(tab === 'my' ? issues : allIssues).map((issue) => (
-                                <article
-                                    key={issue.id}
-                                    className="issue-card"
-                                    onClick={() => navigate(`/issue/${issue.id}`)}
-                                >
-                                    <div className="issue-card-header">
-                                        <div className="issue-category">
-                                            <span className="category-text">
-                                                {issue.category}
-                                            </span>
-                                        </div>
-                                        <div className="issue-id">#{issue.id}</div>
-                                    </div>
 
-                                    <div className="issue-description" style={{ flexGrow: 1 }}>
-                                        {getLocalizedDescription(issue)}
-                                    </div>
-
-                                    <div className="card-footer-recessed">
-                                        <div className="meta-chips-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.75rem' }}>
-                                            <div className="info-chip">
-                                                <AccessTimeRoundedIcon style={{ fontSize: '14px' }} />
-                                                {new Date(issue.timestamp?.endsWith('Z') ? issue.timestamp : issue.timestamp + 'Z').toLocaleDateString('en-IN')}
-                                            </div>
-                                            {issue.ai_status && (
-                                                <div className="info-chip">
-                                                    <SmartToyRoundedIcon style={{ fontSize: '14px' }} />
-                                                    {issue.ai_status}
+                        {/* Enhanced Grid/List View */}
+                        {viewMode === 'map' ? (
+                            <IssueMap issues={paginatedIssues} height="500px" />
+                        ) : (
+                            <>
+                                <div className="grid-v4">
+                                    {paginatedIssues.map(issue => (
+                                        <div key={issue.id} className="card-v4" onClick={() => navigate(`/issue/${issue.id}`)}>
+                                            <div className="card-top">
+                                                <div className="category-with-icon">
+                                                    <span className="category-icon-small">
+                                                        {getCategoryIcon(issue.category)}
+                                                    </span>
+                                                    <span className="badge-category">{issue.category?.toUpperCase()}</span>
                                                 </div>
-                                            )}
+                                                <span className="issue-id">#{issue.id}</span>
+                                            </div>
+                                            <h3 className="card-title">
+                                                {issue.description?.en || issue.voice_text || 'Issue Record'}
+                                            </h3>
+                                            <div className="card-meta">
+                                                <div className="meta-row">
+                                                    <LocationIcon fontSize="small" />
+                                                    <span>{issue.address || 'Location not specified'}</span>
+                                                </div>
+                                                <div className="meta-row">
+                                                    <ScheduleIcon fontSize="small" />
+                                                    <span>{new Date(issue.timestamp || issue.created_at).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
+                                            <div className="card-status-strip">
+                                                <span className="ai-tag"><AIIcon style={{ fontSize: 12 }} /> VERIFIED</span>
+                                                <div className="status-with-icon">
+                                                    <span className="status-icon-small">
+                                                        {getStatusIcon(issue.status)}
+                                                    </span>
+                                                    <span className={`status-tag status-${issue.status?.toLowerCase().replace(' ', '-')}`}>
+                                                        {issue.status?.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span className={`status-badge-unified ${
-                                                issue.status === 'Resolved' ? 'status-success' : 
-                                                issue.status === 'Rejected' ? 'status-danger' : 
-                                                issue.status === 'Reported' ? 'status-primary' : 'status-warning'
-                                            }`}>
-                                                {issue.status || 'Reported'}
-                                            </span>
-                                            {issue.image && <PhotoCameraRoundedIcon style={{ color: '#94a3b8', fontSize: '20px' }} />}
-                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="pagination">
+                                        <button
+                                            onClick={() => setCurrentPage(1)}
+                                            disabled={currentPage === 1}
+                                            className="pagination-btn"
+                                        >
+                                            <FirstPageIcon />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPage(currentPage - 1)}
+                                            disabled={currentPage === 1}
+                                            className="pagination-btn"
+                                        >
+                                            <ChevronLeftIcon />
+                                        </button>
+
+                                        <span className="pagination-info">
+                                            Page {currentPage} of {totalPages}
+                                        </span>
+
+                                        <button
+                                            onClick={() => setCurrentPage(currentPage + 1)}
+                                            disabled={currentPage === totalPages}
+                                            className="pagination-btn"
+                                        >
+                                            <ChevronRightIcon />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPage(totalPages)}
+                                            disabled={currentPage === totalPages}
+                                            className="pagination-btn"
+                                        >
+                                            <LastPageIcon />
+                                        </button>
                                     </div>
-                                </article>
-                            ))}
-                        </div>
-                    )}
-                </section>
-                </>
+                                )}
+                            </>
+                        )}
+                    </section>
                 )}
             </main>
         </div>

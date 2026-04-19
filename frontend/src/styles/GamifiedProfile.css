@@ -252,8 +252,21 @@
   justify-content: center;
   padding: 1rem;
   border-radius: 16px;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   transition: all 0.4s ease;
+}
+
+.badge-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #1f2937;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge-tooltip {
+  left: 50%;
+  top: -8px;
 }
 
 /* Personality colors for icons */

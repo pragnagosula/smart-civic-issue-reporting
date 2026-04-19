@@ -235,56 +235,91 @@ const Dashboard = () => {
             <div className="citizen-tabs">
                 <div className="tabs-container">
                     <button className={`tab-btn ${mainTab === 'overview' ? 'active' : ''}`} onClick={() => setMainTab('overview')}>OVERVIEW</button>
-                    <button className={`tab-btn ${mainTab === 'categories' ? 'active' : ''}`} onClick={() => setMainTab('categories')}>BY CATEGORY</button>
                     <button className={`tab-btn ${mainTab === 'tracker' ? 'active' : ''}`} onClick={() => setMainTab('tracker')}>ISSUE TRACKER</button>
                 </div>
             </div>
 
             <main className="dashboard-container">
-                {/* 1. OVERVIEW TAB */}
+                {/* 1. OVERVIEW & CATEGORIES COMBINED */}
                 {mainTab === 'overview' && (
-                    <section className="dashboard-section">
-                        <div className="section-header">
-                            <h2 className="section-title">Dashboard Overview</h2>
-                            <p className="section-subtitle">Real-time summary of your reported civic issues</p>
-                        </div>
+                    <section className="dashboard-section combined-overview">
+                        {/* TOP STATS ROW */}
                         <div className="stats-grid">
                             <div className="stat-card stat-total">
                                 <div className="stat-val">{stats.total}</div>
                                 <div className="stat-lab">TOTAL ISSUES</div>
+                                <div className="stat-pill pill-grey">All time</div>
                             </div>
                             <div className="stat-card stat-resolved">
                                 <div className="stat-val">{stats.resolved}</div>
                                 <div className="stat-lab">RESOLVED</div>
+                                <div className="stat-pill pill-green">{stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0}% rate</div>
                             </div>
                             <div className="stat-card stat-progress">
                                 <div className="stat-val">{stats.inProgress}</div>
                                 <div className="stat-lab">IN PROGRESS</div>
+                                <div className="stat-pill pill-orange">{stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0}% of total</div>
                             </div>
                             <div className="stat-card stat-pending">
                                 <div className="stat-val">{stats.pending}</div>
                                 <div className="stat-lab">PENDING</div>
+                                <div className="stat-pill pill-grey">Unassigned</div>
                             </div>
                         </div>
-                    </section>
-                )}
 
-                {/* 2. CATEGORIES TAB */}
-                {mainTab === 'categories' && (
-                    <section className="dashboard-section">
-                        <div className="section-header">
-                            <h2 className="section-title">Issues by Category</h2>
-                        </div>
-                        <div className="category-cards-grid">
-                            {Object.entries(categoryStats).map(([cat, count]) => (
-                                <div key={cat} className="category-card">
-                                    <div className="cat-icon-box">{getCategoryIcon(cat)}</div>
-                                    <div className="cat-info">
-                                        <div className="cat-name">{cat}</div>
-                                        <div className="cat-count">{count} Reports</div>
-                                    </div>
+                        {/* BOTTOM PANELS ROW */}
+                        <div className="overview-panels">
+                            {/* ISSUES BY CATEGORY */}
+                            <div className="panel category-panel">
+                                <h3><div className="icon-circle">◎</div> ISSUES BY CATEGORY</h3>
+                                <div className="category-list">
+                                    {Object.entries(categoryStats).map(([cat, count]) => {
+                                        const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                                        return (
+                                            <div key={cat} className="category-row">
+                                                <div className="cat-name-col">
+                                                    <div className="cat-dot"></div>
+                                                    <span className="cat-text">{cat}</span>
+                                                </div>
+                                                <div className="cat-bar-col">
+                                                    <div className="progress-bg">
+                                                        <div className="progress-fill" style={{width: `${percentage}%`}}></div>
+                                                    </div>
+                                                </div>
+                                                <div className="cat-count-col">{count} report{count !== 1 ? 's' : ''}</div>
+                                            </div>
+                                        );
+                                    })}
+                                    {Object.keys(categoryStats).length === 0 && <div className="no-data">No reported categories</div>}
                                 </div>
-                            ))}
+                            </div>
+
+                            {/* RECENT ACTIVITY */}
+                            <div className="panel activity-panel">
+                                <h3><ListIcon style={{fontSize: 18, color: '#64748B'}} /> RECENT ACTIVITY</h3>
+                                <div className="activity-list">
+                                    {issues.slice(0, 4).map(issue => (
+                                        <div key={issue.id} className="activity-item">
+                                            <div className="activity-timeline-line"></div>
+                                            <div className="activity-dot-main"></div>
+                                            <div className="activity-content">
+                                                <div className="activity-title">
+                                                    {issue.category} — {issue.description?.en || issue.voice_text || 'Reported Issue'}
+                                                </div>
+                                                <div className="activity-meta">
+                                                    <span className={`status-pill status-${issue.status?.toLowerCase().replace(' ', '-')}`}>
+                                                        {issue.status}
+                                                    </span>
+                                                    <span className="time-ago">
+                                                        {new Date(issue.timestamp || issue.created_at).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {issues.length === 0 && <div className="no-data">No recent activity</div>}
+                                </div>
+                            </div>
                         </div>
                     </section>
                 )}
@@ -326,51 +361,70 @@ const Dashboard = () => {
                                     />
                                 </div>
 
-                                <div className="filter-row">
-                                    <div className="filter-group">
-                                        <FilterIcon fontSize="small" />
-                                        <select
-                                            value={selectedStatus}
-                                            onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-                                            className="filter-select"
-                                        >
-                                            <option value="">All Statuses</option>
-                                            <option value="Reported">Reported</option>
-                                            <option value="Assigned">Assigned</option>
-                                            <option value="In Progress">In Progress</option>
-                                            <option value="Resolved">Resolved</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="filter-group">
-                                        <FilterIcon fontSize="small" />
-                                        <select
-                                            value={selectedCategory}
-                                            onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
-                                            className="filter-select"
-                                        >
-                                            <option value="">All Categories</option>
-                                            <option value="Roads">Roads</option>
-                                            <option value="Water">Water</option>
-                                            <option value="Sanitation">Sanitation</option>
-                                            <option value="Streetlight">Streetlight</option>
-                                            <option value="Drainage">Drainage</option>
-                                            <option value="Parks">Parks</option>
-                                            <option value="Waste">Waste</option>
-                                            <option value="Other">Other</option>
-                                        </select>
-                                    </div>
-
-                                    <button onClick={resetFilters} className="btn btn-sm btn-secondary">
-                                        Clear Filters
-                                    </button>
+                                <div className="filter-group">
+                                    <span className="filter-label">Status</span>
+                                    <select
+                                        value={selectedStatus}
+                                        onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
+                                        className="filter-select"
+                                    >
+                                        <option value="">All Statuses</option>
+                                        <option value="Reported">Reported</option>
+                                        <option value="Assigned">Assigned</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Resolved">Resolved</option>
+                                    </select>
                                 </div>
+
+                                <div className="filter-group">
+                                    <span className="filter-label">Category</span>
+                                    <select
+                                        value={selectedCategory}
+                                        onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
+                                        className="filter-select"
+                                    >
+                                        <option value="">All Categories</option>
+                                        <option value="Roads">Roads</option>
+                                        <option value="Water">Water</option>
+                                        <option value="Sanitation">Sanitation</option>
+                                        <option value="Streetlight">Streetlight</option>
+                                        <option value="Drainage">Drainage</option>
+                                        <option value="Parks">Parks</option>
+                                        <option value="Waste">Waste</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div className="filter-group sort-group">
+                                    <span className="filter-label">Sort by</span>
+                                    <select
+                                        value={`${sortField}-${sortDirection}`}
+                                        onChange={(e) => {
+                                            const [field, direction] = e.target.value.split('-');
+                                            setSortField(field);
+                                            setSortDirection(direction);
+                                            setCurrentPage(1);
+                                        }}
+                                        className="filter-select"
+                                    >
+                                        <option value="timestamp-desc">Newest first</option>
+                                        <option value="timestamp-asc">Oldest first</option>
+                                        <option value="category-asc">Category A-Z</option>
+                                        <option value="category-desc">Category Z-A</option>
+                                        <option value="status-asc">Status A-Z</option>
+                                        <option value="status-desc">Status Z-A</option>
+                                    </select>
+                                </div>
+
+                                <button onClick={resetFilters} className="filter-clear-btn">
+                                    Clear filters
+                                </button>
                             </div>
 
                             <div className="results-info">
                                 Showing {paginatedIssues.length} of {filteredAndSortedIssues.length} issues
                                 {(searchText || selectedStatus || selectedCategory) && (
-                                    <span className="filter-active"> (filtered)</span>
+                                    <span className="filter-active"> filtered</span>
                                 )}
                             </div>
                         </div>

@@ -125,6 +125,7 @@ exports.reportIssue = async (req, res) => {
 
         if (aiResult.ai_status !== 'CATEGORIZED' || aiResult.category === 'Flagged' || isLowConfidence) {
             issueStatus = 'Flagged';
+            aiResult.category = 'Uncategorized'; // Force clean category to avoid false labels
             console.log(`[BACKEND SAFETY] Issue Flagged. Confidence: ${aiResult.ai_confidence}. Threshold: 0.85`);
         } else {
             // Only check for duplicates if it's a valid, Verified issue

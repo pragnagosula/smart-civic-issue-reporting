@@ -27,8 +27,8 @@ const SelectRole = () => {
 
     return (
         <div className="auth-container">
-            <div className="card" style={{ width: '100%', maxWidth: '850px', margin: '0 auto', borderRadius: '24px', padding: '2.5rem 3rem', background: '#FFFFFF', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.05)', border: '1px solid #f1f5f9' }}>
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div className="card" style={{ width: '100%', maxWidth: '820px', margin: '0 auto', borderRadius: '24px', padding: '2rem 2.5rem', background: '#FFFFFF', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.05)', border: '1px solid #f1f5f9' }}>
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '54px', height: '54px', background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)', borderRadius: '16px', marginBottom: '1rem', boxShadow: '0 10px 25px rgba(59, 130, 246, 0.3)' }}>
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px', color: '#FFFFFF' }}>
                             <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor" />
